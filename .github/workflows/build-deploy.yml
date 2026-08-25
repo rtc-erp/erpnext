@@ -14,6 +14,9 @@ concurrency:
 
 env:
   IMAGE: ghcr.io/rtc-erp/erpnext-custom
+  # Uses images/custom (not layered): layered does FROM frappe/build:${FRAPPE_BRANCH},
+  # which forces FRAPPE_BRANCH to be a published Docker Hub tag. custom builds from
+  # a plain python base and uses FRAPPE_BRANCH only for the git clone, so 'main' works.
   # Pinned: frappe_docker main moves, and an unpinned build tool is not reproducible.
   FRAPPE_DOCKER_REF: 275f0b971525aed57221a5d6f0961c9410723a32
 
@@ -64,7 +67,7 @@ jobs:
         uses: docker/build-push-action@v6
         with:
           context: .
-          file: images/layered/Containerfile
+          file: images/custom/Containerfile
           push: true
           tags: |
             ${{ env.IMAGE }}:${{ steps.meta.outputs.tag }}
