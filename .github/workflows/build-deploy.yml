@@ -1,0 +1,107 @@
+name: Build and Deploy
+
+# Builds a custom frappe image from rtc-erp/frappe + rtc-erp/erpnext (both @ main),
+# pushes it to GHCR, then deploys to amanda (65.109.56.100) behind an approval gate.
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+# Never let two production deploys overlap.
+concurrency:
+  group: rtc-erp-production
+  cancel-in-progress: false
+
+env:
+  IMAGE: ghcr.io/rtc-erp/erpnext-custom
+  # Pinned: frappe_docker main moves, and an unpinned build tool is not reproducible.
+  FRAPPE_DOCKER_REF: 275f0b971525aed57221a5d6f0961c9410723a32
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+    outputs:
+      tag: ${{ steps.meta.outputs.tag }}
+    steps:
+      - name: Check out frappe_docker
+        uses: actions/checkout@v4
+        with:
+          repository: frappe/frappe_docker
+          ref: ${{ env.FRAPPE_DOCKER_REF }}
+
+      - name: Resolve source commits
+        id: meta
+        run: |
+          set -euo pipefail
+          FW=$(git ls-remote https://github.com/rtc-erp/frappe  refs/heads/main | cut -f1)
+          EN=$(git ls-remote https://github.com/rtc-erp/erpnext refs/heads/main | cut -f1)
+          if [ -z "$FW" ] || [ -z "$EN" ]; then
+            echo "::error::could not resolve main on both source repos"; exit 1
+          fi
+          echo "tag=erp-${EN:0:7}-fw-${FW:0:7}" >> "$GITHUB_OUTPUT"
+          echo "Building erpnext@${EN:0:7} + frappe@${FW:0:7}"
+
+      - name: Write apps.json
+        run: |
+          cat > apps.json <<'JSON'
+          [
+            { "url": "https://github.com/rtc-erp/erpnext", "branch": "main" }
+          ]
+          JSON
+
+      - uses: docker/setup-buildx-action@v3
+
+      - uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Build and push
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: images/layered/Containerfile
+          push: true
+          tags: |
+            ${{ env.IMAGE }}:${{ steps.meta.outputs.tag }}
+            ${{ env.IMAGE }}:latest
+          build-args: |
+            FRAPPE_PATH=https://github.com/rtc-erp/frappe
+            FRAPPE_BRANCH=main
+            CACHE_BUST=${{ steps.meta.outputs.tag }}
+          secret-files: |
+            apps_json=apps.json
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+  deploy:
+    needs: build
+    runs-on: ubuntu-latest
+    # Requires manual approval — see repo Settings > Environments > production
+    environment:
+      name: production
+      url: https://rtc.erp4me.net
+    steps:
+      - name: Deploy to amanda
+        env:
+          TAG: ${{ needs.build.outputs.tag }}
+        run: |
+          set -euo pipefail
+          mkdir -p ~/.ssh && chmod 700 ~/.ssh
+          printf '%s\n' "${{ secrets.DEPLOY_SSH_KEY }}" > ~/.ssh/id_ed25519
+          chmod 600 ~/.ssh/id_ed25519
+          printf '%s\n' "${{ secrets.DEPLOY_KNOWN_HOSTS }}" > ~/.ssh/known_hosts
+          ssh -i ~/.ssh/id_ed25519 -o IdentitiesOnly=yes \
+            "${{ secrets.DEPLOY_USER }}@${{ secrets.DEPLOY_HOST }}" \
+            "sudo /opt/rtc-erp/deploy.sh '$TAG'"
+
+      - name: Verify live site
+        run: |
+          set -euo pipefail
+          code=$(curl -s -o /dev/null -w '%{http_code}' --max-time 30 https://rtc.erp4me.net/api/method/ping)
+          echo "public health check: HTTP $code"
+          [ "$code" = "200" ]
