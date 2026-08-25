@@ -1,0 +1,391 @@
+// NU-ERP custom desk chrome.
+// Layout: full-height left sidebar (sibling of .main-section, like the stock
+// one) + sticky top bar inside the scrolling .main-section. The stock sidebar
+// stays alive but invisible, so every stock API (search, notifications,
+// sidebar state resolution) keeps working underneath.
+
+:root {
+	--nu-accent: #ea6c0c;
+	--nu-sidebar-w: 232px;
+	--nu-topbar-h: 48px;
+}
+
+// frappe v16 sets `.icon, .es-icon { margin: 0 auto }` globally, which breaks
+// icon alignment inside our flex rows — reset it within the chrome.
+.nu-topbar .icon,
+.nu-topbar .es-icon,
+.nu-sidebar .icon,
+.nu-sidebar .es-icon,
+.nu-more-card .icon,
+.nu-more-card .es-icon {
+	margin: 0;
+	flex: none;
+}
+
+// 1. Stock sidebar out of view (its JS keeps running and stays our resolver).
+body.nu-chrome .body-sidebar-container {
+	display: none !important;
+}
+
+// 2. Top bar ---------------------------------------------------------------
+
+.nu-topbar {
+	position: sticky;
+	top: 0;
+	z-index: 1020;
+	display: flex;
+	align-items: center;
+	gap: 8px;
+	height: var(--nu-topbar-h);
+	padding: 0 12px;
+	background: var(--fg-color);
+	border-bottom: 1px solid var(--border-color);
+	flex: none;
+}
+
+.nu-tabs {
+	display: flex;
+	align-items: center;
+	gap: 2px;
+	flex: 1;
+	min-width: 0;
+	overflow-x: auto;
+	scrollbar-width: none;
+}
+.nu-tabs::-webkit-scrollbar {
+	display: none;
+}
+
+.nu-tab {
+	display: inline-flex;
+	align-items: center;
+	gap: 7px;
+	height: 32px;
+	padding: 0 10px;
+	border: none;
+	border-radius: 6px;
+	background: transparent;
+	color: var(--text-muted);
+	font-size: 13px;
+	font-weight: 500;
+	white-space: nowrap;
+	transition: background 0.12s ease, color 0.12s ease;
+}
+.nu-tab:hover {
+	background: var(--control-bg);
+	color: var(--text-color);
+}
+.nu-tab.nu-tab-active,
+.nu-tab.nu-tab-active:hover {
+	background: var(--control-bg);
+	color: var(--nu-accent);
+	font-weight: 600;
+}
+
+.nu-topbar-right {
+	display: flex;
+	align-items: center;
+	gap: 6px;
+	flex: none;
+}
+
+.nu-icon-btn {
+	display: inline-flex;
+	align-items: center;
+	justify-content: center;
+	width: 30px;
+	height: 30px;
+	border: none;
+	border-radius: 6px;
+	background: transparent;
+	color: var(--text-muted);
+	transition: background 0.12s ease, color 0.12s ease;
+}
+.nu-icon-btn:hover {
+	background: var(--control-bg);
+	color: var(--text-color);
+}
+
+.nu-menu-toggle {
+	display: none;
+}
+
+.nu-search {
+	display: inline-flex;
+	align-items: center;
+	gap: 7px;
+	height: 30px;
+	padding: 0 10px;
+	border: 1px solid var(--border-color);
+	border-radius: 6px;
+	background: var(--control-bg);
+	color: var(--text-muted);
+	font-size: 13px;
+	transition: background 0.12s ease, color 0.12s ease;
+}
+.nu-search:hover {
+	color: var(--text-color);
+}
+.nu-kbd {
+	font-size: 11px;
+	padding: 1px 5px;
+	border: 1px solid var(--border-color);
+	border-radius: 4px;
+	background: var(--fg-color);
+	color: var(--text-muted);
+}
+
+// 3. More card -------------------------------------------------------------
+
+.nu-more-card {
+	position: absolute;
+	top: calc(100% + 4px);
+	right: 12px;
+	z-index: 1030;
+	width: 320px;
+	max-height: 70vh;
+	display: flex;
+	flex-direction: column;
+	background: var(--fg-color);
+	border: 1px solid var(--border-color);
+	border-radius: 8px;
+	box-shadow: 0 12px 32px rgba(16, 24, 40, 0.16);
+	padding: 8px;
+}
+.nu-more-search {
+	flex: none;
+	padding-bottom: 8px;
+}
+.nu-more-list {
+	overflow-y: auto;
+	display: flex;
+	flex-direction: column;
+}
+.nu-more-module {
+	display: flex;
+	align-items: center;
+	gap: 9px;
+	width: 100%;
+	height: 32px;
+	padding: 0 8px;
+	border: none;
+	border-radius: 6px;
+	background: transparent;
+	color: var(--text-color);
+	font-size: 13px;
+	font-weight: 500;
+	text-align: left;
+}
+.nu-more-module:hover {
+	background: var(--control-bg);
+}
+.nu-more-link {
+	display: flex;
+	align-items: baseline;
+	gap: 8px;
+	padding: 6px 8px 6px 33px;
+	border-radius: 6px;
+	font-size: 13px;
+	color: var(--text-color);
+}
+.nu-more-link:hover {
+	background: var(--control-bg);
+	text-decoration: none;
+}
+.nu-more-link-crumb {
+	font-size: 11px;
+	color: var(--text-muted);
+	text-transform: uppercase;
+	letter-spacing: 0.04em;
+	flex: none;
+}
+.nu-more-empty {
+	padding: 16px;
+	text-align: center;
+	color: var(--text-muted);
+	font-size: 13px;
+}
+
+// 4. Notifications dropdown (stock markup, repositioned under the top bar) --
+
+.nu-topbar .dropdown-notifications {
+	position: absolute;
+	top: calc(100% + 4px);
+	right: 12px;
+	z-index: 1030;
+}
+
+// 5. Left sidebar -----------------------------------------------------------
+
+.nu-sidebar {
+	width: var(--nu-sidebar-w);
+	height: 100vh;
+	flex: none;
+	display: flex;
+	flex-direction: column;
+	background: var(--fg-color);
+	border-right: 1px solid var(--border-color);
+}
+
+.nu-sidebar-head {
+	display: flex;
+	align-items: center;
+	gap: 8px;
+	height: var(--nu-topbar-h);
+	padding: 0 14px;
+	border-bottom: 1px solid var(--border-color);
+	font-size: 14px;
+	font-weight: 600;
+	color: var(--text-color);
+	flex: none;
+}
+.nu-sidebar-head-label {
+	white-space: nowrap;
+	overflow: hidden;
+	text-overflow: ellipsis;
+}
+
+.nu-sidebar-body {
+	flex: 1;
+	min-height: 0;
+	overflow-y: auto;
+	padding: 8px;
+}
+
+.nu-group {
+	margin-bottom: 4px;
+}
+.nu-group-head {
+	display: flex;
+	align-items: center;
+	gap: 6px;
+	width: 100%;
+	height: 28px;
+	padding: 0 6px;
+	border: none;
+	border-radius: 6px;
+	background: transparent;
+	color: var(--text-muted);
+	font-size: 11px;
+	font-weight: 600;
+	letter-spacing: 0.04em;
+	text-transform: uppercase;
+}
+.nu-group-head:hover {
+	background: var(--control-bg);
+	color: var(--text-color);
+}
+.nu-group-head .icon {
+	transition: transform 0.14s ease;
+}
+.nu-group:not(.nu-collapsed) > .nu-group-head .icon {
+	transform: rotate(90deg);
+}
+.nu-group-items {
+	padding: 2px 0 2px 8px;
+}
+.nu-group.nu-collapsed > .nu-group-items {
+	display: none;
+}
+
+.nu-sidebar-row {
+	display: flex;
+	align-items: center;
+	gap: 9px;
+	width: 100%;
+	height: 30px;
+	padding: 0 8px;
+	margin: 1px 0;
+	border: none;
+	border-radius: 6px;
+	background: transparent;
+	color: var(--text-color);
+	font-size: 13px;
+	text-align: left;
+	white-space: nowrap;
+	overflow: hidden;
+}
+.nu-sidebar-row > span {
+	overflow: hidden;
+	text-overflow: ellipsis;
+}
+a.nu-sidebar-row,
+a.nu-sidebar-row:hover {
+	text-decoration: none;
+}
+.nu-sidebar-row:hover {
+	background: var(--control-bg);
+}
+.nu-sidebar-row.nu-active,
+.nu-sidebar-row.nu-active:hover {
+	background: var(--control-bg);
+	color: var(--nu-accent);
+	font-weight: 600;
+}
+
+.nu-sidebar-empty {
+	padding: 16px 10px;
+	color: var(--text-muted);
+	font-size: 13px;
+}
+
+.nu-sidebar-foot {
+	flex: none;
+	border-top: 1px solid var(--border-color);
+	padding: 6px 8px;
+}
+.nu-signout:hover {
+	background: rgba(220, 38, 38, 0.08);
+	color: #dc2626;
+}
+
+.nu-sidebar-overlay {
+	display: none;
+}
+
+// 6. Small screens: sidebar becomes an overlay drawer ------------------------
+
+@media (max-width: 992px) {
+	.nu-menu-toggle {
+		display: inline-flex;
+	}
+	.nu-sidebar {
+		position: fixed;
+		left: 0;
+		top: 0;
+		bottom: 0;
+		height: auto;
+		z-index: 1031;
+		transform: translateX(-100%);
+		transition: transform 0.18s ease;
+		box-shadow: 0 24px 60px rgba(16, 24, 40, 0.28);
+	}
+	body.nu-sidebar-open .nu-sidebar {
+		transform: none;
+	}
+	.nu-sidebar-overlay {
+		display: block;
+		position: fixed;
+		inset: 0;
+		z-index: 1030;
+		background: rgba(0, 0, 0, 0.35);
+		opacity: 0;
+		pointer-events: none;
+		transition: opacity 0.18s ease;
+	}
+	body.nu-sidebar-open .nu-sidebar-overlay {
+		opacity: 1;
+		pointer-events: auto;
+	}
+	.nu-search-label,
+	.nu-kbd {
+		display: none;
+	}
+	.nu-search {
+		border: none;
+		background: transparent;
+		width: 30px;
+		padding: 0;
+		justify-content: center;
+	}
+}

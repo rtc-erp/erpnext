@@ -39,3 +39,6 @@ import "./sales_trends_filters.js";
 import "./purchase_trends_filters.js";
 
 // import { sum } from 'frappe/public/utils/util.js'
+
+// NU-ERP custom desk chrome (top module bar + left menu).
+import "./nu_chrome";
