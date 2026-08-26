@@ -35,6 +35,7 @@ export class NUTopbar {
 					<button class="nu-tab nu-more-tab" data-module="more">
 						${frappe.utils.icon("layout-grid", "sm")}
 						<span>${__("More")}</span>
+						<span class="nu-more-current hidden"></span>
 						${frappe.utils.icon("chevron-down", "xs")}
 					</button>
 				</div>
@@ -56,6 +57,26 @@ export class NUTopbar {
 							</button>`
 							: ""
 					}
+					<button class="nu-icon-btn nu-theme-toggle" title="${__("Theme")}">
+						${frappe.utils.icon(this.theme_icon(), "sm")}
+					</button>
+					<div class="nu-theme-menu hidden">
+						<button class="nu-theme-option" data-theme-mode="light">
+							${frappe.utils.icon("sun", "sm")}
+							<span>${__("Light")}</span>
+							${frappe.utils.icon("tick", "sm")}
+						</button>
+						<button class="nu-theme-option" data-theme-mode="dark">
+							${frappe.utils.icon("moon", "sm")}
+							<span>${__("Dark")}</span>
+							${frappe.utils.icon("tick", "sm")}
+						</button>
+						<button class="nu-theme-option" data-theme-mode="automatic">
+							${frappe.utils.icon("monitor", "sm")}
+							<span>${__("System")}</span>
+							${frappe.utils.icon("tick", "sm")}
+						</button>
+					</div>
 				</div>
 				<div class="nu-more-card hidden">
 					<div class="nu-more-search">
@@ -122,13 +143,27 @@ export class NUTopbar {
 			this.render_more_list(e.target.value.trim().toLowerCase());
 		});
 
+		this.$root.find(".nu-theme-toggle").on("click", (e) => {
+			e.stopPropagation();
+			this.toggle_theme_menu();
+		});
+
+		this.$root.find(".nu-theme-option").on("click", (e) => {
+			this.apply_theme($(e.currentTarget).data("theme-mode"));
+			this.close_theme_menu();
+		});
+
 		document.addEventListener("click", (e) => {
-			if (this.more_open && !this.$root.get(0).contains(e.target)) {
-				this.close_more();
+			if (!this.$root.get(0).contains(e.target)) {
+				if (this.more_open) this.close_more();
+				this.close_theme_menu();
 			}
 		});
 		document.addEventListener("keydown", (e) => {
-			if (e.key === "Escape") this.close_more();
+			if (e.key === "Escape") {
+				this.close_more();
+				this.close_theme_menu();
+			}
 		});
 	}
 
@@ -145,9 +180,23 @@ export class NUTopbar {
 		this.more_open = !this.more_open;
 		this.$root.find(".nu-more-card").toggleClass("hidden", !this.more_open);
 		if (this.more_open) {
+			this.position_more_card();
 			this.render_more_list("");
 			this.$root.find(".nu-more-search input").val("").trigger("focus");
 		}
+	}
+
+	// Open the card directly under the "More" tab (clamped inside the bar),
+	// not at the far right edge of the top bar.
+	position_more_card() {
+		const topbar = this.$root.get(0);
+		const btn = this.$root.find(".nu-more-tab").get(0);
+		const card = this.$root.find(".nu-more-card").get(0);
+		if (!topbar || !btn || !card) return;
+		const card_w = card.offsetWidth || 320;
+		const max_left = topbar.clientWidth - card_w - 8;
+		const left = Math.max(8, Math.min(btn.offsetLeft, max_left));
+		card.style.left = `${left}px`;
 	}
 
 	close_more() {
@@ -196,10 +245,57 @@ export class NUTopbar {
 		}
 	}
 
-	set_active(key) {
+	set_active(key, label) {
 		this.$root.find(".nu-tab").removeClass("nu-tab-active");
+		const $current = this.$root.find(".nu-more-current");
 		if (key) {
 			this.$root.find(`.nu-tab[data-module="${key}"]`).addClass("nu-tab-active");
 		}
+		// When the active module lives in the overflow, the "More" tab widens
+		// to name it; any other active tab clears the label again.
+		if (key === "more" && label) {
+			$current.text(__(label)).removeClass("hidden");
+		} else {
+			$current.addClass("hidden").text("");
+		}
+	}
+
+	// -- theme switcher ------------------------------------------------------
+
+	theme_icon() {
+		const mode = document.documentElement.getAttribute("data-theme-mode") || "light";
+		return { light: "sun", dark: "moon", automatic: "monitor" }[mode] || "sun";
+	}
+
+	toggle_theme_menu() {
+		const $menu = this.$root.find(".nu-theme-menu");
+		const will_open = $menu.hasClass("hidden");
+		this.close_theme_menu();
+		if (will_open) {
+			this.sync_theme_menu();
+			$menu.removeClass("hidden");
+		}
+	}
+
+	close_theme_menu() {
+		this.$root.find(".nu-theme-menu").addClass("hidden");
+	}
+
+	sync_theme_menu() {
+		const mode = document.documentElement.getAttribute("data-theme-mode") || "light";
+		this.$root.find(".nu-theme-option").each(function () {
+			$(this).toggleClass("nu-theme-current", $(this).data("theme-mode") === mode);
+		});
+	}
+
+	apply_theme(mode) {
+		if (!["light", "dark", "automatic"].includes(mode)) return;
+		// Same flow as frappe's own ThemeSwitcher.toggle_theme.
+		document.documentElement.setAttribute("data-theme-mode", mode);
+		frappe.ui.set_theme();
+		this.$root.find(".nu-theme-toggle").html(frappe.utils.icon(this.theme_icon(), "sm"));
+		frappe.xcall("frappe.core.doctype.user.user.switch_theme", {
+			theme: toTitle(mode),
+		});
 	}
 }

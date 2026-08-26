@@ -252,6 +252,29 @@ mark,
 	border-color: var(--border-color);
 }
 
+// Vertical rhythm between stacked surfaces — stock stacks form section
+// cards with zero gap, so outlines touch.
+.form-section.card-section {
+	margin-bottom: 12px;
+}
+
+// Air between the tab strip and the first section card.
+.form-tabs-list {
+	margin-bottom: 12px;
+}
+
+// Comments/activity block: stock gives it no vertical padding, so the
+// comment input hugs whatever outline surrounds it.
+.form-footer {
+	padding: 12px 15px 15px;
+}
+
+// Workspace home pages: stock caps .layout-main at 900px centered, leaving
+// dead space on wide screens — let it fill like list/report pages do.
+body:not(.full-width) [data-page-route="Workspaces"] .layout-main {
+	max-width: none;
+}
+
 // List filter strip: visually part of the card above it.
 .page-form {
 	background-color: var(--card-bg);
