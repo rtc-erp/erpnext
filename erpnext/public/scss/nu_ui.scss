@@ -136,6 +136,25 @@
 	color: var(--text-color);
 }
 
+// Search-match highlight (awesomebar, global search, list rows): the brand
+// accent family instead of the stock yellow highlighter.
+mark,
+.mark {
+	background-color: var(--nu-accent-ring-soft);
+	color: var(--nu-accent-hover);
+	border-radius: 3px;
+	padding: 0 1px;
+}
+
+@keyframes nu-fade-in {
+	from {
+		opacity: 0;
+	}
+	to {
+		opacity: 1;
+	}
+}
+
 @media (prefers-reduced-motion: reduce) {
 	*,
 	*::before,
@@ -248,11 +267,16 @@
 	transition: background-color var(--nu-motion-fast) var(--nu-ease),
 		color var(--nu-motion-fast) var(--nu-ease),
 		border-color var(--nu-motion-fast) var(--nu-ease),
-		box-shadow var(--nu-motion-fast) var(--nu-ease);
+		box-shadow var(--nu-motion-fast) var(--nu-ease),
+		transform var(--nu-motion-fast) var(--nu-ease);
 
 	&:focus-visible {
 		box-shadow: var(--focus-default) !important;
 		outline: none;
+	}
+
+	&:active:not(:disabled):not(.disabled) {
+		transform: scale(0.98);
 	}
 
 	&:disabled,
@@ -696,6 +720,11 @@ input[type="checkbox"] {
 	padding: 6px;
 	box-shadow: var(--shadow-lg);
 
+	// Opacity only — animating transform fights Popper's inline positioning.
+	&.show {
+		animation: nu-fade-in var(--nu-motion-fast) var(--nu-ease);
+	}
+
 	.dropdown-item {
 		border-radius: var(--border-radius-sm);
 		transition: background-color var(--nu-motion-fast) var(--nu-ease),
@@ -716,6 +745,10 @@ input[type="checkbox"] {
 	border-radius: var(--border-radius-md);
 	border: 1px solid var(--border-color);
 	box-shadow: var(--shadow-lg);
+
+	&.show {
+		animation: nu-fade-in var(--nu-motion-fast) var(--nu-ease);
+	}
 }
 
 // Awesomplete (link-field suggestions)
@@ -821,6 +854,46 @@ input[type="checkbox"] {
 	.dt-row:hover .dt-cell {
 		background-color: var(--highlight-color);
 	}
+
+	// Column-filter row: real, quiet inputs instead of gray "skeleton"
+	// pills. Opaque row bg so scrolled content doesn't bleed through the
+	// sticky cells.
+	.dt-row-filter {
+		background-color: var(--card-bg);
+		border-bottom: 1px solid var(--table-border-color);
+	}
+
+	// Match stock's exact specificity (.datatable .dt-row-filter
+	// .dt-filter.dt-input) — our bundle loads later, so these win.
+	.dt-row-filter .dt-filter.dt-input {
+		height: 22px;
+		padding: 1px 8px;
+		border: 1px solid var(--border-color);
+		border-radius: var(--border-radius-sm);
+		background-color: transparent;
+		color: var(--text-color);
+		font-size: var(--text-xs);
+		transition: border-color var(--nu-motion-fast) var(--nu-ease),
+			box-shadow var(--nu-motion-fast) var(--nu-ease),
+			background-color var(--nu-motion-fast) var(--nu-ease);
+
+		&:hover:not(:disabled) {
+			border-color: var(--dark-border-color);
+		}
+
+		&:focus {
+			background-color: var(--nu-input-focus-bg);
+			border-color: transparent;
+			box-shadow: 0 0 0 1px var(--nu-accent), 0 0 0 4px var(--nu-accent-ring-soft);
+			outline: none;
+		}
+
+		// Checkbox/row-number column has no filter — hide its spacer.
+		&:disabled {
+			opacity: 0;
+			pointer-events: none;
+		}
+	}
 }
 
 #page-query-report {
@@ -830,7 +903,162 @@ input[type="checkbox"] {
 }
 
 // ---------------------------------------------------------------------------
-// 15. Misc
+// 15. Kanban view
+// ---------------------------------------------------------------------------
+
+// frappe ships kanban tokens but the lane bg comes from an inline
+// `background-color: var(--bg-gray)` (invisible in light, heavy slab in
+// dark) — re-drive the tokens off our surfaces and kill the inline style
+// (the only !important in this file; inline styles leave no other way).
+:root,
+[data-theme="light"] {
+	--kanban-column-bg: var(--subtle-fg);
+	--kanban-card-bg: var(--card-bg);
+	--kanban-card-hover-bg: var(--card-bg);
+	--kanban-new-card-bg: transparent;
+	--kanban-new-card-hover-bg: var(--nu-accent-soft);
+}
+
+[data-theme="dark"] {
+	--kanban-column-bg: var(--subtle-accent);
+	--kanban-card-bg: var(--control-bg);
+	--kanban-card-hover-bg: var(--control-bg);
+	--kanban-new-card-bg: transparent;
+	--kanban-new-card-hover-bg: var(--nu-accent-soft);
+}
+
+.kanban .kanban-column {
+	background-color: var(--kanban-column-bg) !important;
+	border-radius: var(--border-radius-lg);
+}
+
+// Real cards: raised surface on the lane, consistent with desk cards.
+// Same selector chain as stock so the later bundle wins.
+.kanban .kanban-column .kanban-cards .kanban-card-wrapper .kanban-card {
+	border-radius: var(--border-radius-md);
+	box-shadow: var(--card-shadow);
+	transition: box-shadow var(--nu-motion-med) var(--nu-ease),
+		transform var(--nu-motion-med) var(--nu-ease),
+		border-color var(--nu-motion-fast) var(--nu-ease);
+
+	&:hover {
+		box-shadow: var(--shadow-md);
+		transform: translateY(-1px);
+		border-color: var(--dark-border-color);
+	}
+}
+
+// The "+ Add Task" ghost: quiet dashed action, accent on hover.
+.kanban .kanban-column .add-card {
+	background-color: transparent;
+	border: 1px dashed var(--dark-border-color);
+	border-radius: var(--border-radius-md);
+	transition: border-color var(--nu-motion-fast) var(--nu-ease),
+		color var(--nu-motion-fast) var(--nu-ease),
+		background-color var(--nu-motion-fast) var(--nu-ease);
+
+	&:hover {
+		border-color: var(--nu-accent);
+		color: var(--nu-accent);
+		background-color: var(--nu-accent-soft);
+	}
+}
+
+// ---------------------------------------------------------------------------
+// 16. Calendar view (FullCalendar)
+// ---------------------------------------------------------------------------
+
+.fc {
+	--fc-border-color: var(--table-border-color);
+	--fc-page-bg-color: var(--card-bg);
+	--fc-neutral-bg-color: var(--subtle-accent);
+	--fc-today-bg-color: var(--nu-accent-soft);
+
+	.fc-col-header-cell {
+		font-size: var(--text-xs);
+		font-weight: var(--weight-medium);
+		letter-spacing: 0.02em;
+	}
+
+	.fc-daygrid-day-number {
+		font-variant-numeric: tabular-nums;
+	}
+
+	// Keep the month title on one line when the toolbar wraps on mobile.
+	.fc-toolbar-title {
+		white-space: nowrap;
+	}
+
+	.fc-button-primary {
+		border-radius: var(--border-radius-sm);
+		transition: background-color var(--nu-motion-fast) var(--nu-ease),
+			color var(--nu-motion-fast) var(--nu-ease);
+
+		&:focus {
+			box-shadow: var(--focus-default);
+		}
+	}
+}
+
+// Stock hard-codes `border-color: var(--gray-300) !important` on the grid,
+// which renders near-white in dark mode — same treatment, our token.
+.fc-theme-standard td,
+.fc-theme-standard hr,
+.fc-theme-standard thead,
+.fc-theme-standard tbody,
+.fc-theme-standard .fc-row,
+.fc-theme-standard .fc-popover {
+	border-color: var(--table-border-color) !important;
+}
+
+// Today: soft accent wash + accent marker instead of the stock neutral pill.
+.fc-theme-standard .fc-day-today {
+	background-color: var(--nu-accent-soft) !important;
+
+	.fc-daygrid-day-number {
+		background-color: var(--nu-accent);
+		color: #ffffff;
+		font-weight: var(--weight-semibold);
+	}
+}
+
+// Uncolored events: brand family instead of stock baby blue. Events with
+// an inline color (calendar color-coding) keep it — inline styles win.
+.fc .fc-event {
+	background-color: var(--nu-accent-soft);
+	color: var(--text-color);
+	border-radius: var(--border-radius-sm);
+}
+
+// ---------------------------------------------------------------------------
+// 17. Charts (frappe-charts)
+// ---------------------------------------------------------------------------
+
+// frappe-charts reads these custom properties; frappe themes label/gridline
+// per theme already, so we only align the chrome (tooltip, empty state).
+:root,
+[data-theme="light"] {
+	--charts-tooltip-bg: var(--popover-bg, #ffffff);
+	--charts-tooltip-title: var(--heading-color);
+	--charts-tooltip-label: var(--text-muted);
+	--charts-tooltip-value: var(--text-color);
+}
+
+[data-theme="dark"] {
+	--charts-tooltip-bg: var(--popover-bg);
+	--charts-tooltip-title: var(--heading-color);
+	--charts-tooltip-label: var(--text-muted);
+	--charts-tooltip-value: var(--text-color);
+}
+
+.graph-svg-tip {
+	border: 1px solid var(--border-color);
+	border-radius: var(--border-radius-md);
+	box-shadow: var(--shadow-lg);
+}
+
+// ---------------------------------------------------------------------------
+// 18. Misc
 // ---------------------------------------------------------------------------
 
 .progress {
