@@ -1,0 +1,853 @@
+// NU-ERP desk design system ("nu-ui").
+// Presentation-layer modernization of the stock frappe desk: a single token
+// layer + targeted component polish. Loaded last in erpnext.bundle.scss, so
+// equal-specificity rules win over frappe's. No selectors here restructure
+// layout — only color, surface, radius, shadow, type, spacing-within-
+// components, and motion. Light and dark are both driven off frappe's
+// [data-theme] mechanism.
+
+// ---------------------------------------------------------------------------
+// 1. Tokens
+// ---------------------------------------------------------------------------
+
+:root,
+[data-theme="light"] {
+	// Brand accent (erp4me orange) — used for active/focus/selection only.
+	--nu-accent: #ea6c0c;
+	--nu-accent-hover: #d4610a;
+	--nu-accent-soft: rgba(234, 108, 12, 0.09);
+	--nu-accent-ring: rgba(234, 108, 12, 0.32);
+	--nu-accent-ring-soft: rgba(234, 108, 12, 0.13);
+
+	// Motion
+	--nu-motion-fast: 0.12s;
+	--nu-motion-med: 0.18s;
+	--nu-ease: cubic-bezier(0.2, 0, 0.2, 1);
+
+	// Surfaces — light theme: cool-gray canvas behind white content.
+	--bg-color: #f3f5f7;
+	--fg-color: #ffffff;
+	--card-bg: #ffffff;
+	--subtle-accent: #f3f5f7;
+	--subtle-fg: #edf0f3;
+	--fg-hover-color: #eef0f4;
+	--control-bg: #eef0f3;
+	--control-bg-on-gray: #e3e6eb;
+	--disabled-control-bg: #f3f5f7;
+	--highlight-color: #f1f4f7;
+	--border-color: #e2e5ea;
+	--dark-border-color: #cfd4db;
+	--table-border-color: #e7eaee;
+
+	// Buttons
+	--btn-primary: #1f242b;
+	--btn-primary-hover: #343b44;
+	--primary-color: #1f242b;
+	--btn-default-bg: #eef0f3;
+	--btn-default-hover-bg: #e1e5ea;
+	--btn-ghost-hover-bg: #e9edf1;
+
+	// Elevation — softer, tighter shadows than the stock scale.
+	--shadow-sm: 0px 1px 2px rgba(16, 24, 40, 0.06);
+	--shadow-md: 0px 2px 6px -1px rgba(16, 24, 40, 0.1), 0px 1px 3px rgba(16, 24, 40, 0.06);
+	--shadow-lg: 0px 6px 16px -4px rgba(16, 24, 40, 0.14), 0px 2px 6px -2px rgba(16, 24, 40, 0.07);
+	--card-shadow: 0px 1px 2px rgba(16, 24, 40, 0.05);
+	--modal-shadow: 0px 12px 32px -6px rgba(16, 24, 40, 0.22), 0px 3px 8px -2px rgba(16, 24, 40, 0.1);
+
+	// Focus — orange ring, consistent everywhere.
+	--focus-default: 0 0 0 3px var(--nu-accent-ring);
+	--checkbox-focus-shadow: var(--focus-default);
+
+	// Inputs
+	--nu-input-focus-bg: #ffffff;
+	--skeleton-bg: #eceef2;
+
+	// Accent-driven controls
+	--checkbox-color: var(--nu-accent);
+	--progress-bar-bg: var(--nu-accent);
+	--switch-bg: #c9ced6;
+
+	// Scrollbars
+	--scrollbar-thumb-color: #c4c9d1;
+	--scrollbar-track-color: transparent;
+}
+
+[data-theme="dark"] {
+	// Accent brightened slightly for dark-surface contrast.
+	--nu-accent: #f57721;
+	--nu-accent-hover: #ff8a3d;
+	--nu-accent-soft: rgba(245, 119, 33, 0.16);
+	--nu-accent-ring: rgba(245, 119, 33, 0.42);
+	--nu-accent-ring-soft: rgba(245, 119, 33, 0.18);
+
+	// Surfaces — dark theme: layered cool neutrals, cards above page.
+	--bg-color: #0f1114;
+	--fg-color: #17191e;
+	--card-bg: #17191e;
+	--modal-bg: #17191e;
+	--toast-bg: #1c1f25;
+	--popover-bg: #1c1f25;
+	--subtle-accent: #1a1d23;
+	--subtle-fg: #1e2229;
+	--fg-hover-color: #1f232a;
+	--control-bg: #22262d;
+	--control-bg-on-gray: #272c34;
+	--disabled-control-bg: #1b1e24;
+	--highlight-color: #1c2027;
+	--border-color: #262a32;
+	--dark-border-color: #353b45;
+	--table-border-color: #22262d;
+
+	// Buttons
+	--btn-primary: #e8eaee;
+	--btn-primary-hover: #ffffff;
+	--primary-color: #e8eaee;
+	--btn-default-bg: #22262d;
+	--btn-default-hover-bg: #2b313a;
+	--btn-ghost-hover-bg: #242a32;
+
+	// Elevation — borders carry the structure; shadows stay deep and soft.
+	--shadow-sm: 0px 1px 2px rgba(0, 0, 0, 0.32);
+	--shadow-md: 0px 2px 8px rgba(0, 0, 0, 0.4);
+	--shadow-lg: 0px 8px 24px rgba(0, 0, 0, 0.48);
+	--card-shadow: 0px 1px 2px rgba(0, 0, 0, 0.28);
+	--modal-shadow: 0px 16px 48px rgba(0, 0, 0, 0.6);
+
+	--focus-default: 0 0 0 3px var(--nu-accent-ring);
+	--checkbox-focus-shadow: var(--focus-default);
+
+	--nu-input-focus-bg: #1b1f26;
+	--skeleton-bg: #22262d;
+
+	--checkbox-color: var(--nu-accent);
+	--progress-bar-bg: var(--nu-accent);
+	--switch-bg: #3a414c;
+
+	--scrollbar-thumb-color: #353b45;
+	--scrollbar-track-color: transparent;
+}
+
+// ---------------------------------------------------------------------------
+// 2. Global refinements
+// ---------------------------------------------------------------------------
+
+::selection {
+	background: var(--nu-accent-ring);
+	color: var(--text-color);
+}
+
+@media (prefers-reduced-motion: reduce) {
+	*,
+	*::before,
+	*::after {
+		transition-duration: 0.01ms !important;
+		animation-duration: 0.01ms !important;
+	}
+}
+
+// Thin, quiet scrollbars on the desk's scroll containers.
+.main-section,
+.layout-main-section,
+.modal-body,
+.dropdown-menu,
+.nu-sidebar-body,
+.nu-more-list,
+.awesomebar-suggestion-list,
+.search-results {
+	scrollbar-width: thin;
+	scrollbar-color: var(--scrollbar-thumb-color) var(--scrollbar-track-color);
+
+	&::-webkit-scrollbar {
+		width: 8px;
+		height: 8px;
+	}
+	&::-webkit-scrollbar-thumb {
+		background: var(--scrollbar-thumb-color);
+		border-radius: 8px;
+		border: 2px solid transparent;
+		background-clip: content-box;
+	}
+	&::-webkit-scrollbar-track {
+		background: var(--scrollbar-track-color);
+	}
+}
+
+// ---------------------------------------------------------------------------
+// 3. Typography
+// ---------------------------------------------------------------------------
+
+.page-title {
+	.title-text,
+	h1,
+	h2,
+	h3 {
+		font-weight: var(--weight-semibold);
+		letter-spacing: -0.011em;
+		color: var(--heading-color);
+	}
+}
+
+// Section heads read as structure, not content.
+.section-head {
+	font-weight: var(--weight-semibold);
+	letter-spacing: -0.005em;
+	color: var(--heading-color);
+}
+
+// Numeric data aligns cleanly.
+.dt-cell__content,
+.number-widget-box .number,
+.list-view .list-row-col:has(.text-right) {
+	font-variant-numeric: tabular-nums;
+}
+
+// ---------------------------------------------------------------------------
+// 4. Page scaffolding
+// ---------------------------------------------------------------------------
+
+.page-head {
+	border-bottom: 1px solid var(--border-color);
+
+	.page-head-content {
+		gap: 12px;
+	}
+}
+
+// Breadcrumbs: quiet until touched.
+.page-head .title-area {
+	a,
+	.sub-heading {
+		transition: color var(--nu-motion-fast) var(--nu-ease);
+	}
+}
+
+// Content cards get a hairline and a 12px corner so they read as surfaces
+// on the gray canvas (light) / raised surface (dark).
+.layout-main-section.frappe-card {
+	border: 1px solid var(--border-color);
+	border-radius: var(--border-radius-lg);
+	box-shadow: none;
+}
+
+.frappe-card {
+	border-color: var(--border-color);
+}
+
+// List filter strip: visually part of the card above it.
+.page-form {
+	background-color: var(--card-bg);
+}
+
+// ---------------------------------------------------------------------------
+// 5. Buttons
+// ---------------------------------------------------------------------------
+
+.btn {
+	font-weight: var(--weight-medium);
+	letter-spacing: -0.003em;
+	transition: background-color var(--nu-motion-fast) var(--nu-ease),
+		color var(--nu-motion-fast) var(--nu-ease),
+		border-color var(--nu-motion-fast) var(--nu-ease),
+		box-shadow var(--nu-motion-fast) var(--nu-ease);
+
+	&:focus-visible {
+		box-shadow: var(--focus-default) !important;
+		outline: none;
+	}
+
+	&:disabled,
+	&.disabled {
+		opacity: 0.55;
+		cursor: not-allowed;
+	}
+}
+
+.btn.btn-primary {
+	box-shadow: var(--shadow-sm);
+
+	&:hover {
+		background-color: var(--btn-primary-hover);
+		color: var(--neutral);
+	}
+
+	&:active {
+		box-shadow: none !important;
+	}
+}
+
+.btn.btn-default,
+.btn.btn-secondary {
+	&:hover {
+		background-color: var(--btn-default-hover-bg);
+	}
+}
+
+.btn.btn-danger {
+	&:hover {
+		background-color: #c92f2f;
+		color: #ffffff;
+	}
+}
+
+.btn.btn-outline {
+	border-color: var(--dark-border-color);
+	background-color: transparent;
+
+	&:hover {
+		background-color: var(--subtle-accent);
+		border-color: var(--dark-border-color);
+	}
+}
+
+.icon-btn {
+	border-radius: var(--border-radius-sm);
+	transition: background-color var(--nu-motion-fast) var(--nu-ease),
+		color var(--nu-motion-fast) var(--nu-ease);
+
+	&:hover {
+		background-color: var(--control-bg);
+	}
+}
+
+// ---------------------------------------------------------------------------
+// 6. Inputs & form controls
+// ---------------------------------------------------------------------------
+
+.form-control,
+.input-with-feedback {
+	transition: background-color var(--nu-motion-fast) var(--nu-ease),
+		box-shadow var(--nu-motion-fast) var(--nu-ease),
+		border-color var(--nu-motion-fast) var(--nu-ease);
+
+	&:hover:not(:focus):not(:disabled):not(.like-disabled-input) {
+		background-color: var(--control-bg-on-gray);
+	}
+
+	&:focus {
+		background-color: var(--nu-input-focus-bg);
+		box-shadow: 0 0 0 1px var(--nu-accent), 0 0 0 4px var(--nu-accent-ring-soft);
+		border-color: transparent;
+		outline: none;
+	}
+}
+
+select.form-control:focus {
+	background-color: var(--nu-input-focus-bg);
+}
+
+.like-disabled-input,
+.form-control:disabled {
+	background-color: var(--disabled-control-bg);
+	color: var(--disabled-text-color);
+}
+
+// Labels: smaller, quieter, medium weight — values carry the emphasis.
+.control-label,
+.form-label {
+	font-weight: var(--weight-medium);
+	font-size: var(--text-xs);
+	letter-spacing: 0.01em;
+	color: var(--text-light);
+}
+
+.help-box,
+.control-note {
+	color: var(--text-muted);
+}
+
+// Checkboxes: accent fill, white tick, both themes.
+input[type="checkbox"] {
+	border: 1px solid var(--dark-border-color);
+	border-radius: 5px;
+	transition: background-color var(--nu-motion-fast) var(--nu-ease),
+		border-color var(--nu-motion-fast) var(--nu-ease),
+		box-shadow var(--nu-motion-fast) var(--nu-ease);
+
+	&:hover:not(:disabled):not(:checked) {
+		border-color: var(--gray-500);
+	}
+
+	&:checked {
+		background-color: var(--nu-accent);
+		background-image: url("data:image/svg+xml, <svg viewBox='0 0 8 7' fill='none' xmlns='http://www.w3.org/2000/svg'><path d='M1 4.00001L2.66667 5.80001L7 1.20001' stroke='white' stroke-width='1.5' stroke-linecap='round' stroke-linejoin='round'/></svg>"),
+			linear-gradient(180deg, var(--nu-accent) 0%, var(--nu-accent) 100%);
+		background-size: 57%, 100%;
+		border: none;
+	}
+
+	&:disabled:checked,
+	&.disabled-selected {
+		background-color: var(--disabled-text-color);
+		border: none;
+	}
+}
+
+[data-theme="dark"] input[type="checkbox"]:checked {
+	background-color: var(--nu-accent);
+	background-image: url("data:image/svg+xml, <svg viewBox='0 0 8 7' fill='none' xmlns='http://www.w3.org/2000/svg'><path d='M1 4.00001L2.66667 5.80001L7 1.20001' stroke='white' stroke-width='1.5' stroke-linecap='round' stroke-linejoin='round'/></svg>"),
+		linear-gradient(180deg, var(--nu-accent) 0%, var(--nu-accent) 100%);
+	background-size: 57%, 100%;
+	border: none;
+}
+
+// Toggle switches (both generations of markup): accent track when on.
+.switch-control {
+	.input-area:has(input:checked) ~ .switch-visual {
+		background-color: var(--nu-accent);
+	}
+
+	.switch-visual {
+		transition: background-color var(--nu-motion-med) var(--nu-ease);
+	}
+
+	.switch-thumb {
+		transition: transform var(--nu-motion-med) var(--nu-ease);
+	}
+
+	.input-area:has(input:focus-visible) ~ .switch-visual {
+		box-shadow: var(--focus-default);
+	}
+}
+
+.switch input:checked + .slider {
+	background-color: var(--nu-accent);
+}
+
+// ---------------------------------------------------------------------------
+// 7. List view
+// ---------------------------------------------------------------------------
+
+.list-row-head {
+	background-color: var(--subtle-accent);
+	border: 1px solid var(--table-border-color);
+	border-radius: var(--border-radius-sm);
+	font-size: var(--text-xs);
+	font-weight: var(--weight-medium);
+	color: var(--text-muted);
+	letter-spacing: 0.015em;
+}
+
+.list-row {
+	border-bottom: 1px solid var(--table-border-color);
+	transition: background-color var(--nu-motion-fast) var(--nu-ease),
+		color var(--nu-motion-fast) var(--nu-ease);
+}
+
+.list-row-container {
+	&:hover {
+		background-color: var(--highlight-color);
+	}
+
+	&:focus {
+		outline: none;
+
+		.list-row {
+			box-shadow: inset 2px 0 0 var(--nu-accent);
+		}
+	}
+}
+
+// Checked rows: quiet accent tint instead of a stark state change.
+.list-row-container:has(input[type="checkbox"]:checked) {
+	background-color: var(--nu-accent-soft);
+
+	.list-row .level-right {
+		background-color: transparent;
+	}
+}
+
+.list-paging-area {
+	.btn-group .btn {
+		border-radius: 0;
+
+		&:first-child {
+			border-radius: var(--border-radius-sm) 0 0 var(--border-radius-sm);
+		}
+		&:last-child {
+			border-radius: 0 var(--border-radius-sm) var(--border-radius-sm) 0;
+		}
+	}
+
+	.btn-default.btn-paging {
+		box-shadow: none;
+
+		&.btn-info {
+			background-color: var(--nu-accent-soft);
+			color: var(--nu-accent);
+			font-weight: var(--weight-semibold);
+		}
+	}
+}
+
+// Empty states: more air, calmer icon.
+.no-result {
+	.no-result-icon svg {
+		color: var(--text-light);
+		opacity: 0.6;
+	}
+
+	.no-result-title {
+		font-weight: var(--weight-medium);
+		color: var(--text-color);
+	}
+}
+
+// Skeletons keep the stock breathe animation, on the themed token.
+.list-skeleton-box,
+.workspace-skeleton .skeleton-card {
+	background-color: var(--skeleton-bg);
+}
+
+// ---------------------------------------------------------------------------
+// 8. Indicator pills & badges
+// ---------------------------------------------------------------------------
+
+.indicator-pill,
+.indicator-pill-right {
+	font-weight: var(--weight-medium);
+	font-size: var(--text-xs);
+	letter-spacing: 0.01em;
+	height: 22px;
+	padding: 3px 10px;
+}
+
+.badge {
+	border-radius: var(--border-radius-full);
+	font-weight: var(--weight-medium);
+}
+
+// ---------------------------------------------------------------------------
+// 9. Workspace widgets
+// ---------------------------------------------------------------------------
+
+.widget {
+	border-radius: var(--border-radius-lg);
+	box-shadow: var(--card-shadow);
+	transition: box-shadow var(--nu-motion-med) var(--nu-ease),
+		transform var(--nu-motion-med) var(--nu-ease),
+		border-color var(--nu-motion-fast) var(--nu-ease);
+}
+
+.widget-shadow:hover,
+.widget.shortcut-widget-box:hover,
+.widget.number-widget-box:hover {
+	box-shadow: var(--shadow-md);
+	transform: translateY(-1px);
+}
+
+.widget-group-title {
+	letter-spacing: -0.008em;
+}
+
+.widget.number-widget-box {
+	border: 1px solid var(--border-color);
+
+	.widget-body .widget-content .number {
+		font-weight: var(--weight-semibold);
+		letter-spacing: -0.015em;
+		font-variant-numeric: tabular-nums;
+	}
+
+	&:hover {
+		border-color: var(--dark-border-color);
+	}
+}
+
+.widget.shortcut-widget-box {
+	border: 1px solid var(--border-color);
+
+	&:hover {
+		// Stock turns icon + label invert-neutral on hover; keep the accent
+		// family instead so the chrome brand carries into the workspace.
+		border-color: var(--dark-border-color);
+
+		.widget-label .widget-title {
+			color: var(--nu-accent);
+		}
+	}
+}
+
+.widget.links-widget-box {
+	border: 1px solid var(--border-color);
+
+	.link-item {
+		border-radius: var(--border-radius-sm);
+		transition: background-color var(--nu-motion-fast) var(--nu-ease);
+
+		&:hover {
+			background-color: var(--subtle-accent);
+		}
+
+		&:focus-visible {
+			box-shadow: var(--focus-default);
+			outline: none;
+		}
+	}
+}
+
+// ---------------------------------------------------------------------------
+// 10. Form view
+// ---------------------------------------------------------------------------
+
+.form-tabs-list {
+	border-bottom: 1px solid var(--border-color);
+
+	.form-tabs .nav-item .nav-link {
+		color: var(--text-light);
+		transition: color var(--nu-motion-fast) var(--nu-ease),
+			border-color var(--nu-motion-fast) var(--nu-ease);
+
+		&:hover:not(.active) {
+			color: var(--text-color);
+		}
+
+		&.active {
+			font-weight: var(--weight-medium);
+			color: var(--text-neutral);
+			border-bottom: 2px solid var(--nu-accent);
+		}
+	}
+}
+
+.form-section.card-section {
+	border: 1px solid var(--border-color);
+	border-radius: var(--border-radius-lg);
+}
+
+.form-message {
+	border-radius: var(--border-radius-md);
+}
+
+// Right rail
+.form-sidebar {
+	.sidebar-section {
+		border-bottom: 1px solid var(--table-border-color);
+	}
+
+	.avatar-frame {
+		border-radius: var(--border-radius-lg);
+		border: 1px solid var(--border-color);
+	}
+}
+
+// Assignment / attachment / tag rows
+.assignments,
+.attachment-row,
+.form-tag-row,
+.share-row {
+	border-radius: var(--border-radius-sm);
+}
+
+// Timeline + comments
+.new-timeline {
+	.timeline-item .timeline-content {
+		border-radius: var(--border-radius-md);
+	}
+}
+
+.comment-input-wrapper {
+	border-radius: var(--border-radius-md);
+	border: 1px solid var(--border-color);
+	transition: box-shadow var(--nu-motion-fast) var(--nu-ease),
+		border-color var(--nu-motion-fast) var(--nu-ease);
+
+	&:focus-within {
+		border-color: transparent;
+		box-shadow: 0 0 0 1px var(--nu-accent), 0 0 0 4px var(--nu-accent-ring-soft);
+	}
+}
+
+// ---------------------------------------------------------------------------
+// 11. Dialogs, dropdowns, popovers
+// ---------------------------------------------------------------------------
+
+.modal-content {
+	border-radius: var(--border-radius-xl);
+	border: 1px solid var(--border-color);
+	box-shadow: var(--modal-shadow);
+}
+
+.modal-header {
+	.modal-title {
+		font-weight: var(--weight-semibold);
+		letter-spacing: -0.01em;
+		color: var(--heading-color);
+	}
+
+	.btn-modal-close {
+		border-radius: var(--border-radius-sm);
+		transition: background-color var(--nu-motion-fast) var(--nu-ease);
+
+		&:hover {
+			background-color: var(--control-bg);
+		}
+	}
+}
+
+.modal-footer {
+	background-color: var(--subtle-accent);
+	border-top: 1px solid var(--border-color);
+	border-radius: 0 0 var(--border-radius-xl) var(--border-radius-xl);
+}
+
+.dropdown-menu {
+	border: 1px solid var(--border-color);
+	border-radius: var(--border-radius-md);
+	padding: 6px;
+	box-shadow: var(--shadow-lg);
+
+	.dropdown-item {
+		border-radius: var(--border-radius-sm);
+		transition: background-color var(--nu-motion-fast) var(--nu-ease),
+			color var(--nu-motion-fast) var(--nu-ease);
+
+		&:hover {
+			background-color: var(--fg-hover-color);
+		}
+	}
+
+	.dropdown-divider,
+	.divider {
+		border-color: var(--table-border-color);
+	}
+}
+
+.popover {
+	border-radius: var(--border-radius-md);
+	border: 1px solid var(--border-color);
+	box-shadow: var(--shadow-lg);
+}
+
+// Awesomplete (link-field suggestions)
+.awesomplete > ul {
+	border: 1px solid var(--border-color);
+	border-radius: var(--border-radius-md);
+	box-shadow: var(--shadow-lg);
+	padding: 4px;
+
+	> li {
+		border-radius: var(--border-radius-sm);
+
+		&:hover,
+		&[aria-selected="true"] {
+			background: var(--awesomplete-hover-bg);
+		}
+	}
+}
+
+// ---------------------------------------------------------------------------
+// 12. Alerts & toasts
+// ---------------------------------------------------------------------------
+
+.desk-alert {
+	border-radius: var(--border-radius-md);
+	box-shadow: var(--modal-shadow);
+	border: 1px solid var(--border-color);
+}
+
+.alert {
+	border-radius: var(--border-radius-md);
+	border: 1px solid transparent;
+}
+
+// ---------------------------------------------------------------------------
+// 13. Awesomebar / global search / notifications
+// ---------------------------------------------------------------------------
+
+.search-bar {
+	border-radius: var(--border-radius-md);
+	transition: background-color var(--nu-motion-fast) var(--nu-ease),
+		box-shadow var(--nu-motion-fast) var(--nu-ease);
+
+	&:focus-within {
+		box-shadow: 0 0 0 1px var(--nu-accent), 0 0 0 4px var(--nu-accent-ring-soft);
+	}
+}
+
+.navbar-modal-wrapper {
+	.modal-content {
+		border-radius: var(--border-radius-lg);
+	}
+}
+
+.search-dialog {
+	.search-input,
+	input {
+		&:focus {
+			box-shadow: 0 0 0 1px var(--nu-accent), 0 0 0 4px var(--nu-accent-ring-soft);
+		}
+	}
+
+	.search-results .result-row,
+	.result-row {
+		border-radius: var(--border-radius-sm);
+
+		&:hover {
+			background-color: var(--fg-hover-color);
+		}
+	}
+}
+
+.dropdown-notifications {
+	border-radius: var(--border-radius-md);
+	border: 1px solid var(--border-color);
+	box-shadow: var(--shadow-lg);
+
+	.notification-list-item,
+	.notifications-list .list-item {
+		border-radius: var(--border-radius-sm);
+		transition: background-color var(--nu-motion-fast) var(--nu-ease);
+
+		&:hover {
+			background-color: var(--fg-hover-color);
+		}
+	}
+}
+
+// ---------------------------------------------------------------------------
+// 14. Reports / datatable
+// ---------------------------------------------------------------------------
+
+.datatable {
+	--dt-border-color: var(--table-border-color);
+
+	.dt-header .dt-cell {
+		font-weight: var(--weight-medium);
+		font-size: var(--text-xs);
+		letter-spacing: 0.015em;
+		color: var(--text-muted);
+	}
+
+	.dt-row:hover .dt-cell {
+		background-color: var(--highlight-color);
+	}
+}
+
+#page-query-report {
+	.page-form .form-group {
+		margin-bottom: var(--margin-sm);
+	}
+}
+
+// ---------------------------------------------------------------------------
+// 15. Misc
+// ---------------------------------------------------------------------------
+
+.progress {
+	border-radius: var(--border-radius-full);
+
+	.progress-bar {
+		background-color: var(--progress-bar-bg);
+	}
+}
+
+// Datepicker active date uses the accent.
+.datepicker--cell.-selected-,
+.datepicker--cell.-selected-.-focus- {
+	background-color: var(--nu-accent);
+	color: #ffffff;
+}
+
+.datepicker--cell.-in-range- {
+	background-color: var(--nu-accent-soft);
+}
