@@ -91,6 +91,19 @@ body.nu-chrome .body-sidebar-container {
 	font-weight: 600;
 }
 
+// Active overflow module named inside the "More" tab (set via JS).
+.nu-more-current {
+	max-width: 140px;
+	overflow: hidden;
+	text-overflow: ellipsis;
+	white-space: nowrap;
+	padding-left: 7px;
+	margin-left: 2px;
+	border-left: 1px solid currentColor;
+	opacity: 0.85;
+	font-weight: 500;
+}
+
 .nu-topbar-right {
 	display: flex;
 	align-items: center;
@@ -162,7 +175,9 @@ body.nu-chrome .body-sidebar-container {
 .nu-more-card {
 	position: absolute;
 	top: calc(100% + 6px);
-	right: 12px;
+	// Anchored under the "More" tab by JS (position_more_card); this is only
+	// the pre-open fallback.
+	left: 8px;
 	z-index: 1030;
 	width: 320px;
 	max-height: 70vh;
@@ -246,6 +261,53 @@ body.nu-chrome .body-sidebar-container {
 	top: calc(100% + 6px);
 	right: 12px;
 	z-index: 1030;
+}
+
+// 4b. Theme switcher menu (under the top-bar theme button) ------------------
+
+.nu-theme-menu {
+	position: absolute;
+	top: calc(100% + 6px);
+	right: 12px;
+	z-index: 1030;
+	min-width: 168px;
+	padding: 6px;
+	background: var(--fg-color);
+	border: 1px solid var(--border-color);
+	border-radius: var(--border-radius-md, 10px);
+	box-shadow: var(--shadow-lg, 0 12px 32px rgba(16, 24, 40, 0.16));
+}
+.nu-theme-option {
+	display: flex;
+	align-items: center;
+	gap: 9px;
+	width: 100%;
+	height: 32px;
+	padding: 0 8px;
+	border: none;
+	border-radius: 8px;
+	background: transparent;
+	color: var(--text-color);
+	font-size: 13px;
+	font-weight: 500;
+	text-align: left;
+	transition: background var(--nu-motion-fast, 0.12s) var(--nu-ease, ease);
+}
+.nu-theme-option:hover {
+	background: var(--fg-hover-color);
+}
+.nu-theme-option:focus-visible {
+	outline: none;
+	box-shadow: var(--focus-default);
+}
+// The tick is hidden unless this option is the active mode.
+.nu-theme-option .icon:last-child {
+	margin-left: auto;
+	visibility: hidden;
+	color: var(--nu-accent);
+}
+.nu-theme-option.nu-theme-current .icon:last-child {
+	visibility: visible;
 }
 
 // 5. Left sidebar -----------------------------------------------------------
@@ -364,6 +426,57 @@ a.nu-sidebar-row:hover {
 	background: var(--nu-accent-soft);
 	color: var(--nu-accent);
 	font-weight: 600;
+}
+
+// Pin affordance at the end of each row: hidden until the row is hovered,
+// always visible (and accent) once pinned.
+.nu-pin-btn {
+	display: inline-flex;
+	align-items: center;
+	justify-content: center;
+	width: 22px;
+	height: 22px;
+	margin-left: auto;
+	flex: none;
+	border: none;
+	border-radius: 6px;
+	background: transparent;
+	color: var(--text-muted);
+	opacity: 0;
+	transition: opacity var(--nu-motion-fast, 0.12s) var(--nu-ease, ease),
+		background var(--nu-motion-fast, 0.12s) var(--nu-ease, ease),
+		color var(--nu-motion-fast, 0.12s) var(--nu-ease, ease);
+}
+.nu-sidebar-row:hover .nu-pin-btn,
+.nu-pin-btn:focus-visible {
+	opacity: 1;
+}
+.nu-pin-btn:hover {
+	background: var(--control-bg);
+	color: var(--text-color);
+}
+.nu-pin-btn:focus-visible {
+	outline: none;
+	box-shadow: var(--focus-default);
+}
+.nu-sidebar-row.nu-pinned .nu-pin-btn {
+	opacity: 1;
+	color: var(--nu-accent);
+}
+
+// Pinned section at the top of the sidebar body.
+.nu-pinned-section {
+	padding-bottom: 6px;
+	margin-bottom: 6px;
+	border-bottom: 1px solid var(--border-color);
+}
+.nu-pinned-label {
+	padding: 0 6px 4px;
+	color: var(--text-muted);
+	font-size: 11px;
+	font-weight: 600;
+	letter-spacing: 0.05em;
+	text-transform: uppercase;
 }
 
 .nu-sidebar-empty {

@@ -1,15 +1,37 @@
 // NU-ERP custom desk chrome — left menu.
 // Renders the active module's sidebar items as collapsible groups (collapsed
-// by default), with Settings and Sign out pinned at the bottom.
+// by default), with Settings and Sign out pinned at the bottom. Users can
+// pin individual rows; pinned rows surface in a "Pinned" section at the top
+// and persist per user via frappe's own user-settings store (no schema or
+// erpnext artifacts touched).
 
 import { group_items, item_path } from "./data";
 
 const GROUP_STATE_KEY = "nu-chrome-groups";
+const PINS_DOCTYPE = "Workspace";
+const PINS_KEY = "nu_chrome_pins";
 
 export class NUSidebar {
 	constructor(chrome) {
 		this.chrome = chrome;
+		this.pins = {};
 		this.render_shell();
+		this.load_pins();
+	}
+
+	load_pins() {
+		if (frappe.session.user === "Guest") return;
+		frappe.model.user_settings.get(PINS_DOCTYPE).then((settings) => {
+			this.pins = (settings && settings[PINS_KEY]) || {};
+			// Re-render the current sidebar once pins are known.
+			if (this._last) this.show(...this._last);
+		}, () => {
+			// Pins are an enhancement — keep the sidebar working without them.
+		});
+	}
+
+	save_pins() {
+		frappe.model.user_settings.save(PINS_DOCTYPE, PINS_KEY, this.pins);
 	}
 
 	render_shell() {
@@ -61,6 +83,7 @@ export class NUSidebar {
 
 	// groups: [{ label, items }] from data.group_items or data.reports_groups
 	show(title, icon, groups, state_key) {
+		this._last = [title, icon, groups, state_key];
 		this.state_key = state_key || title.toLowerCase();
 		this.$root.find(".nu-sidebar-head-icon").html(icon ? frappe.utils.icon(icon, "md") : "");
 		this.$root.find(".nu-sidebar-head-label").text(__(title));
@@ -68,6 +91,29 @@ export class NUSidebar {
 		const $body = this.$root.find(".nu-sidebar-body").empty();
 		const stored = this.get_group_state()[this.state_key] || {};
 		const current_path = this.current_path();
+
+		// Every link in this sidebar, flattened, so pinned rows can be
+		// surfaced at the top (above the first collapsible group).
+		const all_links = [];
+		for (const group of groups) {
+			for (const item of group.items) {
+				const path = item_path(item);
+				if (path) all_links.push({ item, path });
+			}
+		}
+		const pinned_paths = new Set(this.pins[this.state_key] || []);
+		const pinned_links = all_links.filter((link) => pinned_paths.has(link.path));
+		if (pinned_links.length) {
+			const $pinned = $(`
+				<div class="nu-pinned-section">
+					<div class="nu-pinned-label">${__("Pinned")}</div>
+				</div>
+			`);
+			for (const link of pinned_links) {
+				$pinned.append(this.make_link(link, current_path));
+			}
+			$body.append($pinned);
+		}
 
 		for (const group of groups) {
 			const links = group.items
@@ -80,8 +126,9 @@ export class NUSidebar {
 				continue;
 			}
 
-			// Groups are collapsed by default unless the user opened them before.
-			const collapsed = stored[group.label] !== false;
+			// Groups are collapsed by default; once the user opens one it
+			// stays open (stored true = opened).
+			const collapsed = stored[group.label] !== true;
 			const $group = $(`
 				<div class="nu-group ${collapsed ? "nu-collapsed" : ""}">
 					<button class="nu-group-head">
@@ -125,16 +172,40 @@ export class NUSidebar {
 		const active =
 			current_path &&
 			(current_path === link.path || current_path.startsWith(link.path.replace(/\/$/, "") + "/"));
+		const pinned = (this.pins[this.state_key] || []).includes(link.path);
 		const $link = $(`
-			<a class="nu-sidebar-row ${active ? "nu-active" : ""}">
+			<a class="nu-sidebar-row ${active ? "nu-active" : ""} ${pinned ? "nu-pinned" : ""}">
 				${frappe.utils.icon(link.item.icon || "list", "sm")}
 				<span>${frappe.utils.escape_html(__(link.item.label))}</span>
+				<button class="nu-pin-btn" title="${pinned ? __("Unpin") : __("Pin")}" tabindex="-1">
+					${frappe.utils.icon(pinned ? "pin-off" : "pin", "xs")}
+				</button>
 			</a>
 		`);
 		$link.attr("href", link.path);
 		$link.attr("title", __(link.item.label));
 		$link.on("click", () => this.close_drawer());
+		$link.find(".nu-pin-btn").on("click", (e) => {
+			e.preventDefault();
+			e.stopPropagation();
+			this.toggle_pin(link.path);
+		});
 		return $link;
+	}
+
+	toggle_pin(path) {
+		const current = this.pins[this.state_key] || [];
+		const next = current.includes(path)
+			? current.filter((p) => p !== path)
+			: [...current, path];
+		if (next.length) {
+			this.pins[this.state_key] = next;
+		} else {
+			delete this.pins[this.state_key];
+		}
+		this.save_pins();
+		// Re-render so the row moves between the group and the Pinned section.
+		if (this._last) this.show(...this._last);
 	}
 
 	current_path() {

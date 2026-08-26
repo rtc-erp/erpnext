@@ -128,7 +128,7 @@ class NUChrome {
 			title: mod.data.label || mod.label,
 			data: mod.data,
 		};
-		this.topbar.set_active("more");
+		this.topbar.set_active("more", this.active.title);
 		this.sidebar.show(
 			this.active.title,
 			mod.data.header_icon,
