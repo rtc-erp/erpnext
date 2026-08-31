@@ -1140,25 +1140,12 @@ input[type="checkbox"] {
 	}
 }
 
-@keyframes nu-page-leave {
-	from {
-		opacity: 1;
-		transform: none;
-	}
-	to {
-		opacity: 0;
-		transform: translateY(-5px);
-	}
-}
-
 // jQuery .show() flips display none→block on route change, which restarts the
-// animation — one rule covers every page swap in the desk.
+// animation — one rule covers every page swap in the desk. CSS-only on
+// purpose: an earlier JS exit-fade deferred the swap and broke stock's
+// "visible after change_to returns" invariant (blank pages on live).
 body.nu-chrome .page-container {
 	animation: nu-page-enter 0.26s cubic-bezier(0.16, 1, 0.3, 1);
-}
-
-body.nu-chrome .page-container.nu-page-leaving {
-	animation: nu-page-leave 0.09s ease-in forwards;
 }
 
 // -- Route progress bar ------------------------------------------------------

@@ -5,8 +5,8 @@
 // all patches live on prototypes at erpnext-bundle time and are idempotent.
 //
 // Layers:
-//   1. Page transitions — exit fade on the outgoing page + CSS enter
-//      animation on the incoming one (nu_ui.scss, section 19).
+//   1. Page transitions — pure CSS enter animation on every page swap
+//      (nu_ui.scss, section 19). Deliberately no JS in the swap path.
 //   2. Route bar — thin accent progress line for the async window between
 //      "route changed" and "new page painted with its data".
 //   3. Skeletons — shimmer placeholders while data is in flight:
@@ -18,7 +18,6 @@
 // prefers-reduced-motion rule in nu_ui.scss.
 
 const SHOW_DELAY = 140; // ms a fetch must take before a skeleton appears
-const EXIT_MS = 90; // outgoing page fade before the swap
 const OUT_MS = 240; // skeleton crossfade-out duration (keep > CSS transition)
 
 function reduced_motion() {
@@ -213,30 +212,13 @@ class NURouteBar {
 // Patches
 // ---------------------------------------------------------------------------
 
-// 1. Page transitions: fade the outgoing page out before the swap. The enter
-//    animation is pure CSS (restarts whenever a page goes display:none→block).
-function patch_page_transitions() {
-	const proto = frappe.views.Container && frappe.views.Container.prototype;
-	if (!proto || !mark_patched(proto)) return;
-	const orig_change_to = proto.change_to;
-
-	proto.change_to = function (label) {
-		const prev = this.page;
-		const next = label.tagName ? label : frappe.pages[label];
-		if (!next || !prev || prev === next || reduced_motion() || document.hidden) {
-			return orig_change_to.call(this, label);
-		}
-		// A newer change_to supersedes any pending one — swap immediately.
-		const token = (this.__nu_transition = (this.__nu_transition || 0) + 1);
-		$(prev).addClass("nu-page-leaving");
-		setTimeout(() => {
-			if (this.__nu_transition !== token) return;
-			$(prev).removeClass("nu-page-leaving");
-			orig_change_to.call(this, label);
-		}, EXIT_MS);
-		return this.page;
-	};
-}
+// NOTE: page transitions are CSS-only (nu_ui.scss §19 — the enter animation
+// restarts whenever a page flips display none→block). An earlier version also
+// wrapped Container.change_to to delay the swap for an exit fade, but that
+// 90ms deferral broke stock's invariant "after change_to returns, the page is
+// visible" — views that render synchronously after the call (workspaces with
+// cached data, forms) rendered into a still-hidden container and could blank
+// the page. Never defer the swap again; keep motion out of the timing path.
 
 // 2. List-family views (List, Report, Kanban, Calendar, Gantt, Dashboard,
 //    Image, Map): skeleton while the data call is in flight — on first load
@@ -350,7 +332,6 @@ function patch_workspace_skeletons() {
 // ---------------------------------------------------------------------------
 
 function init_motion() {
-	patch_page_transitions();
 	patch_list_skeletons();
 	patch_form_skeletons();
 	patch_query_report_skeletons();
