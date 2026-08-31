@@ -61,6 +61,7 @@
 	// Inputs
 	--nu-input-focus-bg: #ffffff;
 	--skeleton-bg: #eceef2;
+	--nu-skel-sheen: #f8f9fb;
 
 	// Accent-driven controls
 	--checkbox-color: var(--nu-accent);
@@ -118,6 +119,7 @@
 
 	--nu-input-focus-bg: #1b1f26;
 	--skeleton-bg: #22262d;
+	--nu-skel-sheen: #2b313a;
 
 	--checkbox-color: var(--nu-accent);
 	--progress-bar-bg: var(--nu-accent);
@@ -548,7 +550,7 @@ input[type="checkbox"] {
 	}
 }
 
-// Skeletons keep the stock breathe animation, on the themed token.
+// Skeletons shimmer on the themed token (full shimmer treatment in §19).
 .list-skeleton-box,
 .workspace-skeleton .skeleton-card {
 	background-color: var(--skeleton-bg);
@@ -1117,4 +1119,337 @@ input[type="checkbox"] {
 
 .datepicker--cell.-in-range- {
 	background-color: var(--nu-accent-soft);
+}
+
+// ---------------------------------------------------------------------------
+// 19. Motion — page transitions, route progress, skeleton loading
+// ---------------------------------------------------------------------------
+// JS lives in public/js/nu_chrome/motion.js. Everything here is scoped to
+// body.nu-chrome so non-desk contexts (print, web) are never touched.
+
+// -- Page transitions --------------------------------------------------------
+
+@keyframes nu-page-enter {
+	from {
+		opacity: 0;
+		transform: translateY(10px) scale(0.998);
+	}
+	to {
+		opacity: 1;
+		transform: none;
+	}
+}
+
+@keyframes nu-page-leave {
+	from {
+		opacity: 1;
+		transform: none;
+	}
+	to {
+		opacity: 0;
+		transform: translateY(-5px);
+	}
+}
+
+// jQuery .show() flips display none→block on route change, which restarts the
+// animation — one rule covers every page swap in the desk.
+body.nu-chrome .page-container {
+	animation: nu-page-enter 0.26s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+body.nu-chrome .page-container.nu-page-leaving {
+	animation: nu-page-leave 0.09s ease-in forwards;
+}
+
+// -- Route progress bar ------------------------------------------------------
+
+.nu-route-bar {
+	position: fixed;
+	top: calc(var(--nu-topbar-h, 48px) - 2px);
+	left: var(--nu-sidebar-w, 0);
+	right: 0;
+	height: 2px;
+	z-index: 1045;
+	opacity: 0;
+	transition: opacity 0.2s ease;
+	pointer-events: none;
+	overflow: hidden;
+
+	@media (max-width: 991px) {
+		left: 0;
+	}
+
+	&.nu-active {
+		opacity: 1;
+	}
+
+	&.nu-done .nu-route-bar-inner {
+		animation: none;
+		width: 100%;
+		opacity: 0;
+		transition: width 0.18s ease-out, opacity 0.3s ease 0.1s;
+	}
+}
+
+.nu-route-bar-inner {
+	position: absolute;
+	top: 0;
+	left: 0;
+	height: 100%;
+	width: 40%;
+	border-radius: 999px;
+	background: linear-gradient(90deg, var(--nu-accent), var(--nu-accent-hover));
+	animation: nu-route-slide 1.1s cubic-bezier(0.45, 0, 0.55, 1) infinite;
+}
+
+@keyframes nu-route-slide {
+	from {
+		left: -40%;
+	}
+	to {
+		left: 100%;
+	}
+}
+
+// -- Skeleton primitives -----------------------------------------------------
+
+@keyframes nu-skel-shimmer {
+	from {
+		background-position: 180% 0;
+	}
+	to {
+		background-position: -80% 0;
+	}
+}
+
+@keyframes nu-skel-layer-in {
+	from {
+		opacity: 0;
+	}
+	to {
+		opacity: 1;
+	}
+}
+
+@keyframes nu-row-in {
+	from {
+		opacity: 0;
+		transform: translateY(6px);
+	}
+	to {
+		opacity: 1;
+		transform: none;
+	}
+}
+
+.nu-skel {
+	display: block;
+	border-radius: 6px;
+	background: linear-gradient(
+		100deg,
+		var(--skeleton-bg) 38%,
+		var(--nu-skel-sheen) 50%,
+		var(--skeleton-bg) 62%
+	);
+	background-size: 220% 100%;
+	animation: nu-skel-shimmer 1.5s linear infinite;
+}
+
+// Layer that hosts a skeleton. Overlays stale content (absolute) or fills an
+// empty area (static); entry is a quick fade, exit a crossfade into the data.
+.nu-skel-layer {
+	position: absolute;
+	inset: 0;
+	z-index: 5;
+	background: var(--card-bg);
+	animation: nu-skel-layer-in 0.16s ease-out;
+
+	&.nu-skel-static {
+		position: static;
+	}
+
+	&.nu-skel-out {
+		opacity: 0;
+		transition: opacity 0.22s ease;
+		pointer-events: none;
+	}
+}
+
+// Rows (list / report family)
+.nu-skel-row {
+	display: flex;
+	align-items: center;
+	gap: 18px;
+	height: 44px;
+	padding: 0 16px;
+	border-bottom: 1px solid var(--table-border-color);
+	animation: nu-row-in 0.3s cubic-bezier(0.16, 1, 0.3, 1) backwards;
+
+	@for $i from 2 through 12 {
+		&:nth-child(#{$i}) {
+			animation-delay: #{($i - 1) * 0.02}s;
+		}
+	}
+}
+
+.nu-skel-dot {
+	width: 14px;
+	height: 14px;
+	border-radius: 4px;
+	flex: none;
+}
+
+.nu-skel-bar {
+	height: 10px;
+	flex: none;
+}
+
+.nu-skel-pill {
+	width: 64px;
+	height: 20px;
+	border-radius: 999px;
+	flex: none;
+	margin-left: auto;
+}
+
+.nu-skel-row-head {
+	.nu-skel-pill {
+		display: none;
+	}
+}
+
+// Kanban
+.nu-skel-kanban-inner {
+	display: flex;
+	gap: 16px;
+	padding: 16px;
+}
+
+.nu-skel-col {
+	flex: 1;
+	display: flex;
+	flex-direction: column;
+	gap: 12px;
+	min-width: 0;
+
+	> .nu-skel-pill {
+		margin-left: 0;
+		width: 40%;
+		height: 16px;
+	}
+}
+
+.nu-skel-card {
+	display: flex;
+	flex-direction: column;
+	justify-content: center;
+	gap: 10px;
+	height: 84px;
+	padding: 0 14px;
+	border-radius: var(--border-radius-lg);
+	background: var(--fg-color);
+	border: 1px solid var(--border-color);
+}
+
+// Calendar
+.nu-skel-calendar-inner {
+	display: grid;
+	grid-template-columns: repeat(7, 1fr);
+	gap: 1px;
+	padding: 12px;
+	background: var(--table-border-color);
+}
+
+.nu-skel-cell {
+	min-height: 72px;
+	background: var(--card-bg);
+	padding: 8px;
+
+	.nu-skel-bar {
+		width: 60%;
+	}
+}
+
+// Form
+.nu-skel-form-inner {
+	padding: 4px 0;
+}
+
+.nu-skel-section {
+	display: grid;
+	grid-template-columns: repeat(3, 1fr);
+	gap: 22px 24px;
+	background: var(--card-bg);
+	border-radius: var(--border-radius-lg);
+	box-shadow: var(--card-shadow);
+	padding: 22px;
+	margin-bottom: 16px;
+
+	@media (max-width: 991px) {
+		grid-template-columns: 1fr;
+	}
+}
+
+.nu-skel-field {
+	display: flex;
+	flex-direction: column;
+	gap: 8px;
+
+	.nu-skel-bar {
+		height: 9px;
+	}
+}
+
+.nu-skel-input {
+	height: 28px;
+	border-radius: var(--border-radius-md);
+}
+
+// Query report — the stock $loading wrapper is a flex-centered message box;
+// stretch the skeleton out of it so it reads as the report, not a modal.
+.nu-skel-layer.nu-skel-report {
+	flex: 1 1 auto;
+	align-self: stretch;
+	width: 100%;
+	background: transparent;
+	padding: 0 4px;
+}
+
+// -- Stock skeleton upgrades -------------------------------------------------
+
+// Stock list + workspace skeletons get the shimmer and a soft exit instead of
+// the stock breathe / instant removal.
+.list-skeleton-box,
+.workspace-skeleton .skeleton-card {
+	background: linear-gradient(
+		100deg,
+		var(--skeleton-bg) 38%,
+		var(--nu-skel-sheen) 50%,
+		var(--skeleton-bg) 62%
+	) !important;
+	background-size: 220% 100% !important;
+	animation: nu-skel-shimmer 1.5s linear infinite !important;
+}
+
+.workspace-skeleton {
+	animation: nu-skel-layer-in 0.16s ease-out;
+
+	&.nu-skel-out {
+		opacity: 0;
+		transition: opacity 0.22s ease;
+		pointer-events: none;
+	}
+}
+
+// -- Real-content entry ------------------------------------------------------
+
+// Rows cascade in whenever a list-family view (re)renders its result set.
+body.nu-chrome .list-view .list-row-container {
+	animation: nu-row-in 0.3s cubic-bezier(0.16, 1, 0.3, 1) backwards;
+
+	@for $i from 2 through 12 {
+		&:nth-child(#{$i}) {
+			animation-delay: #{($i - 1) * 0.018}s;
+		}
+	}
 }

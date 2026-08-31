@@ -13,8 +13,13 @@ import {
 } from "./data";
 import { NUTopbar } from "./topbar";
 import { NUSidebar } from "./sidebar";
+import { init_motion } from "./motion";
 
 const LAST_ROUTE_KEY = "nu-chrome-last-routes";
+
+// Page transitions, route progress, and skeleton loading. Independent of the
+// chrome boot below — it only patches frappe prototypes, so run it eagerly.
+init_motion();
 
 // Hide the stock sidebar before first paint; the class also scopes all our
 // layout overrides in nu_chrome.scss.
