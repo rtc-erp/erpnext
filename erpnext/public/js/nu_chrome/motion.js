@@ -330,7 +330,10 @@ function patch_query_report_skeletons() {
 }
 
 // 5. Workspaces: stock skeleton stays, but it now shimmers (CSS) and fades
-//    out instead of vanishing.
+//    out instead of vanishing. CRITICAL: create_page_skeleton() hides
+//    .codex-editor via addClass("hidden") and stock remove_page_skeleton()
+//    un-hides it — any override must keep that un-hide, or every workspace
+//    past the first renders invisibly (the blank-page incident).
 function patch_workspace_skeletons() {
 	const proto = frappe.views.Workspace && frappe.views.Workspace.prototype;
 	if (!proto || !mark_patched(proto)) return;
@@ -339,6 +342,7 @@ function patch_workspace_skeletons() {
 	proto.remove_page_skeleton = function () {
 		const $skel = this.body && this.body.find(".workspace-skeleton");
 		if (!$skel || !$skel.length) return orig_remove.call(this);
+		this.body.find(".codex-editor").removeClass("hidden"); // stock un-hide — never drop this
 		$skel.addClass("nu-skel-out");
 		setTimeout(() => $skel.remove(), OUT_MS);
 	};
@@ -425,9 +429,17 @@ function arm_workspace_watchdog() {
 			const $editorjs = ws.body.find("#editorjs");
 			const blocks = $editorjs.find(".ce-block").length;
 			const codex = $editorjs.find(".codex-editor").length;
+			const codex_hidden = $editorjs.find(".codex-editor.hidden").length > 0;
 			const skeletons = ws.body.find(".workspace-skeleton").length;
 			const loading = frappe.request && frappe.request.ajax_count > 0;
 			if (skeletons > 0 || loading || attempts >= 2 || !ws._page) return;
+
+			// A hidden editor is a stuck blank page even with blocks in the
+			// DOM — strip the class (cheap) rather than rebuilding.
+			if (codex_hidden) {
+				console.warn("nu_motion: hidden workspace editor detected, unhiding", route);
+				$editorjs.find(".codex-editor").removeClass("hidden");
+			}
 
 			const rebuild = (fresh_editor) => {
 				attempts++;
