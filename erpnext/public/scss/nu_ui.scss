@@ -385,6 +385,29 @@ body:not(.full-width) [data-page-route="Workspaces"] .layout-main {
 	}
 }
 
+// "Filters applied" toggle (stock .btn-primary-light): a static gray-300 slab
+// with color: var(--primary) — a var frappe never defines. It's an active
+// state, so it belongs to the accent family: soft accent fill, contrast text.
+.btn.btn-primary-light {
+	background-color: var(--nu-accent-soft);
+	border-color: transparent;
+	color: var(--nu-accent-contrast);
+	font-weight: var(--weight-medium);
+	transition: background-color var(--nu-motion-fast) var(--nu-ease),
+		color var(--nu-motion-fast) var(--nu-ease),
+		box-shadow var(--nu-motion-fast) var(--nu-ease);
+
+	&:hover,
+	&:active {
+		background-color: var(--nu-accent-muted);
+		color: var(--nu-accent-contrast);
+	}
+
+	&:focus-visible {
+		box-shadow: var(--focus-default) !important;
+	}
+}
+
 .icon-btn {
 	border-radius: var(--border-radius-sm);
 	transition: background-color var(--nu-motion-fast) var(--nu-ease),
