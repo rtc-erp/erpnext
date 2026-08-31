@@ -297,9 +297,26 @@ function patch_query_report_skeletons() {
 		this.$loading
 			.html(`<div class="nu-skel-layer nu-skel-static nu-skel-report">${report_html()}</div>`)
 			.show();
+		// Failsafe: if the report call fails (4xx/5xx), stock never calls
+		// hide_loading_screen (the refresh promise's callback only fires on
+		// success) — don't leave an opaque skeleton over the page. Re-arms
+		// while requests are genuinely still in flight (slow reports).
+		const arm_failsafe = () => {
+			clearTimeout(this.__nu_loading_failsafe);
+			this.__nu_loading_failsafe = setTimeout(() => {
+				if (frappe.request && frappe.request.ajax_count > 0) {
+					arm_failsafe();
+				} else {
+					this.hide_loading_screen();
+				}
+			}, 8000);
+		};
+		arm_failsafe();
 	};
 
 	proto.hide_loading_screen = function () {
+		clearTimeout(this.__nu_loading_failsafe);
+		this.__nu_loading_failsafe = null;
 		const $loading = this.$loading;
 		if (!$loading || !$loading.is(":visible")) return;
 		const $layer = $loading.find(".nu-skel-layer");
@@ -327,6 +344,116 @@ function patch_workspace_skeletons() {
 	};
 }
 
+// 6. Workspace navigation race (root cause of intermittent blank workspaces
+//    on live): stock show_page is re-entrant and editor.render is
+//    fire-and-forget behind editor.isReady, both sharing mutable state
+//    (this.content / this.page_data / this._page). Overlapping runs produce
+//    partial, wrong, or empty renders — and because this._page is set before
+//    rendering, the early-return in show() then keeps the broken page until
+//    refresh. Two guards:
+//    a) serialize show_page (latest request wins; failures clear _page so a
+//       retry can recover instead of sticking);
+//    b) serialize editor.render (a render never starts during another, and a
+//       superseded render is skipped).
+function patch_workspace_race() {
+	const proto = frappe.views.Workspace && frappe.views.Workspace.prototype;
+	if (!proto || !mark_patched(proto)) return;
+
+	const orig_show_page = proto.show_page;
+	proto.show_page = function (page) {
+		this.__nu_pending_page = page;
+		if (this.__nu_show_busy) return this.__nu_show_promise || Promise.resolve();
+		this.__nu_show_busy = true;
+		this.__nu_show_promise = (async () => {
+			while (this.__nu_pending_page) {
+				const next = this.__nu_pending_page;
+				this.__nu_pending_page = null;
+				try {
+					await orig_show_page.call(this, next);
+				} catch (e) {
+					console.warn("nu_motion: workspace show_page failed, recovering", e);
+					this._page = null; // don't trap the early-return guard
+					try {
+						this.remove_page_skeleton();
+					} catch (_) {}
+				}
+			}
+			this.__nu_show_busy = false;
+		})();
+		return this.__nu_show_promise;
+	};
+
+	const orig_init = proto.initialize_editorjs;
+	proto.initialize_editorjs = function (blocks) {
+		const out = orig_init.apply(this, arguments);
+		if (this.editor && !this.editor.__nu_serialized) {
+			this.editor.__nu_serialized = true;
+			const orig_render = this.editor.render.bind(this.editor);
+			let chain = Promise.resolve();
+			let latest = null;
+			this.editor.render = (data) => {
+				latest = data;
+				const p = chain.then(() => {
+					if (latest !== data) return; // superseded by a newer render
+					return orig_render(data);
+				});
+				chain = p.catch(() => {});
+				return p;
+			};
+		}
+		return out;
+	};
+}
+
+// 7. Self-heal watchdog: after any page change settles, if the visible
+//    workspace page ended up empty — either no rendered blocks, or the
+//    editor's DOM node itself is gone (stock can never recover from that:
+//    EditorJS keeps rendering into a detached node) — rebuild it, recreating
+//    the editor instance when needed. Safety net for blank-workspace failure
+//    modes: the page repairs itself instead of needing a manual refresh.
+function arm_workspace_watchdog() {
+	let attempts = 0;
+	$(document).on("page-change", () => {
+		attempts = 0;
+		const check = () => {
+			const ws = frappe.workspace;
+			const route = frappe.get_route_str();
+			if (!ws || !ws.body || !/^(Workspaces|private\/)/.test(route)) return;
+			const $page = $('.page-container[data-page-route="Workspaces"]');
+			if (!$page.length || $page.css("display") === "none") return;
+
+			const $editorjs = ws.body.find("#editorjs");
+			const blocks = $editorjs.find(".ce-block").length;
+			const codex = $editorjs.find(".codex-editor").length;
+			const skeletons = ws.body.find(".workspace-skeleton").length;
+			const loading = frappe.request && frappe.request.ajax_count > 0;
+			if (skeletons > 0 || loading || attempts >= 2 || !ws._page) return;
+
+			const rebuild = (fresh_editor) => {
+				attempts++;
+				console.warn(
+					`nu_motion: ${fresh_editor ? "workspace editor DOM missing, recreating" : "empty workspace detected, rebuilding"}`,
+					route
+				);
+				if (fresh_editor) {
+					try {
+						ws.editor && ws.editor.destroy && ws.editor.destroy();
+					} catch (_) {}
+					ws.editor = null;
+					$editorjs.remove(); // force show_page to recreate it
+				}
+				const page = ws._page;
+				ws._page = null; // bypass the early-return guard
+				Promise.resolve(ws.show_page(page)).then(() => setTimeout(check, 1500));
+			};
+
+			if (!$editorjs.length || !codex) return rebuild(true);
+			if (blocks === 0) return rebuild(false);
+		};
+		setTimeout(check, 2500);
+	});
+}
+
 // ---------------------------------------------------------------------------
 // Boot
 // ---------------------------------------------------------------------------
@@ -336,6 +463,8 @@ function init_motion() {
 	patch_form_skeletons();
 	patch_query_report_skeletons();
 	patch_workspace_skeletons();
+	patch_workspace_race();
+	arm_workspace_watchdog();
 
 	const bar = new NURouteBar();
 
