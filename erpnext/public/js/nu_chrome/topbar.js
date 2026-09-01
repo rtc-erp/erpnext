@@ -27,7 +27,7 @@ export class NUTopbar {
 
 		this.$root = $(`
 			<div class="nu-topbar">
-				<button class="nu-icon-btn nu-menu-toggle" title="${__("Menu")}">
+				<button class="nu-icon-btn nu-menu-toggle" data-tip="${__("Menu")}" aria-label="${__("Menu")}">
 					${frappe.utils.icon("menu", "sm")}
 				</button>
 				<div class="nu-tabs" role="navigation">
@@ -42,7 +42,7 @@ export class NUTopbar {
 				<div class="nu-topbar-right">
 					${
 						frappe.boot.desk_settings.search_bar
-							? `<button class="nu-search" title="${__("Search")}">
+							? `<button class="nu-search" data-tip="${__("Search")}" aria-label="${__("Search")}">
 								${frappe.utils.icon("search", "sm")}
 								<span class="nu-search-label">${__("Search")}</span>
 								<span class="nu-kbd">${frappe.utils.is_mac() ? "⌘K" : "Ctrl+K"}</span>
@@ -51,13 +51,13 @@ export class NUTopbar {
 					}
 					${
 						frappe.boot.desk_settings.notifications && frappe.session.user !== "Guest"
-							? `<button class="nu-icon-btn sidebar-notification hidden" title="${__("Notifications")}">
+							? `<button class="nu-icon-btn sidebar-notification hidden" data-tip="${__("Notifications")}" aria-label="${__("Notifications")}">
 								${frappe.utils.icon("bell", "sm")}
 								<span class="sidebar-notification-count hidden" aria-live="polite"></span>
 							</button>`
 							: ""
 					}
-					<button class="nu-icon-btn nu-theme-toggle" title="${__("Theme")}">
+					<button class="nu-icon-btn nu-theme-toggle" data-tip="${__("Theme")}" aria-label="${__("Theme")}">
 						${frappe.utils.icon(this.theme_icon(), "sm")}
 					</button>
 					<div class="nu-theme-menu hidden">
@@ -133,9 +133,11 @@ export class NUTopbar {
 
 		this.$root.find(".sidebar-notification").on("click", () => {
 			const $dropdown = this.$root.find(".dropdown-notifications");
-			$dropdown.toggleClass("hidden");
-			if (!$dropdown.hasClass("hidden")) {
+			if ($dropdown.hasClass("hidden")) {
+				$dropdown.removeClass("hidden nu-menu-out");
 				$dropdown.trigger("show.bs.dropdown");
+			} else {
+				this.hide_menu($dropdown);
 			}
 		});
 
@@ -178,11 +180,14 @@ export class NUTopbar {
 
 	toggle_more() {
 		this.more_open = !this.more_open;
-		this.$root.find(".nu-more-card").toggleClass("hidden", !this.more_open);
+		const $card = this.$root.find(".nu-more-card");
 		if (this.more_open) {
+			$card.removeClass("hidden nu-menu-out");
 			this.position_more_card();
 			this.render_more_list("");
 			this.$root.find(".nu-more-search input").val("").trigger("focus");
+		} else {
+			this.hide_menu($card);
 		}
 	}
 
@@ -199,9 +204,22 @@ export class NUTopbar {
 		card.style.left = `${left}px`;
 	}
 
+	// Hide a .hidden-toggled menu with a short exit transition (the mirror of
+	// the nu-menu-in keyframe entry in nu_chrome.scss) instead of an instant
+	// display flip.
+	hide_menu($el) {
+		if ($el.hasClass("hidden") || $el.hasClass("nu-menu-out")) return;
+		$el.addClass("nu-menu-out");
+		setTimeout(() => {
+			// Re-opened meanwhile — the open path clears nu-menu-out.
+			if (!$el.hasClass("nu-menu-out")) return;
+			$el.addClass("hidden").removeClass("nu-menu-out");
+		}, 140);
+	}
+
 	close_more() {
 		this.more_open = false;
-		this.$root.find(".nu-more-card").addClass("hidden");
+		this.hide_menu(this.$root.find(".nu-more-card"));
 	}
 
 	render_more_list(query) {
@@ -273,12 +291,12 @@ export class NUTopbar {
 		this.close_theme_menu();
 		if (will_open) {
 			this.sync_theme_menu();
-			$menu.removeClass("hidden");
+			$menu.removeClass("hidden nu-menu-out");
 		}
 	}
 
 	close_theme_menu() {
-		this.$root.find(".nu-theme-menu").addClass("hidden");
+		this.hide_menu(this.$root.find(".nu-theme-menu"));
 	}
 
 	sync_theme_menu() {

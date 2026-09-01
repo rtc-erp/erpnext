@@ -135,10 +135,10 @@ export class NUSidebar {
 						${frappe.utils.icon("chevron-right", "sm")}
 						<span>${frappe.utils.escape_html(__(group.label))}</span>
 					</button>
-					<div class="nu-group-items"></div>
+					<div class="nu-group-items"><div class="nu-group-items-inner"></div></div>
 				</div>
 			`);
-			const $items = $group.find(".nu-group-items");
+			const $items = $group.find(".nu-group-items-inner");
 			for (const link of links) $items.append(this.make_link(link, current_path));
 
 			$group.find(".nu-group-head").on("click", () => {
@@ -156,6 +156,13 @@ export class NUSidebar {
 		if (!$body.children().length) {
 			$body.append(`<div class="nu-sidebar-empty">${__("No items")}</div>`);
 		}
+
+		// Suppress the collapse animation for the state rendered here (stored +
+		// auto-expanded active group); only user toggles should animate.
+		$body.addClass("nu-groups-static");
+		requestAnimationFrame(() =>
+			requestAnimationFrame(() => $body.removeClass("nu-groups-static"))
+		);
 
 		this.expand_active_group();
 	}
@@ -177,13 +184,12 @@ export class NUSidebar {
 			<a class="nu-sidebar-row ${active ? "nu-active" : ""} ${pinned ? "nu-pinned" : ""}">
 				${frappe.utils.icon(link.item.icon || "list", "sm")}
 				<span>${frappe.utils.escape_html(__(link.item.label))}</span>
-				<button class="nu-pin-btn" title="${pinned ? __("Unpin") : __("Pin")}" tabindex="-1">
+				<button class="nu-pin-btn" data-tip="${pinned ? __("Unpin") : __("Pin")}" data-tip-pos="left" aria-label="${pinned ? __("Unpin") : __("Pin")}" tabindex="-1">
 					${frappe.utils.icon(pinned ? "pin-off" : "pin", "xs")}
 				</button>
 			</a>
 		`);
 		$link.attr("href", link.path);
-		$link.attr("title", __(link.item.label));
 		$link.on("click", () => this.close_drawer());
 		$link.find(".nu-pin-btn").on("click", (e) => {
 			e.preventDefault();

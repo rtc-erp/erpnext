@@ -311,6 +311,84 @@ body.nu-chrome .body-sidebar-container {
 	visibility: visible;
 }
 
+// 4c. Top-bar menu motion + chrome tooltips ----------------------------------
+
+// The chrome menus toggle via .hidden (display:none), so entry motion has to
+// be a keyframe (transitions don't run on display flips). Short and spatial:
+// the menu emerges from the bar above it.
+@keyframes nu-menu-in {
+	from {
+		opacity: 0;
+		transform: translateY(-4px);
+	}
+	to {
+		opacity: 1;
+		transform: none;
+	}
+}
+
+.nu-theme-menu:not(.hidden),
+.nu-more-card:not(.hidden),
+.nu-topbar .dropdown-notifications:not(.hidden) {
+	animation: nu-menu-in var(--nu-motion-med, 0.18s) var(--nu-ease, ease);
+}
+
+// Exit: JS (topbar.js hide_menu) holds the element visible for one beat with
+// this class before re-adding .hidden — the mirror of the entry.
+.nu-menu-out {
+	opacity: 0;
+	transform: translateY(-4px);
+	transition: opacity var(--nu-motion-fast, 0.12s) var(--nu-ease, ease),
+		transform var(--nu-motion-fast, 0.12s) var(--nu-ease, ease);
+}
+
+// Styled tooltips for chrome controls ([data-tip] — set in place of title so
+// the unstyled native tooltip never appears). Default placement: below the
+// control; data-tip-pos="left" flips it to the side (pin buttons).
+[data-tip] {
+	position: relative;
+}
+
+[data-tip]::after {
+	content: attr(data-tip);
+	position: absolute;
+	top: calc(100% + 7px);
+	left: 50%;
+	transform: translateX(-50%) translateY(-2px);
+	z-index: 1070;
+	padding: 4px 9px;
+	border-radius: 6px;
+	background: var(--heading-color, #1c2128);
+	color: var(--fg-color);
+	font-size: 11px;
+	font-weight: 500;
+	line-height: 1.4;
+	white-space: nowrap;
+	box-shadow: var(--shadow-md);
+	opacity: 0;
+	pointer-events: none;
+	transition: opacity var(--nu-motion-fast, 0.12s) var(--nu-ease, ease) 0.35s,
+		transform var(--nu-motion-fast, 0.12s) var(--nu-ease, ease) 0.35s;
+}
+
+[data-tip]:hover::after,
+[data-tip]:focus-visible::after {
+	opacity: 1;
+	transform: translateX(-50%) translateY(0);
+}
+
+[data-tip-pos="left"]::after {
+	top: 50%;
+	left: auto;
+	right: calc(100% + 7px);
+	transform: translateY(-50%) translateX(2px);
+}
+
+[data-tip-pos="left"]:hover::after,
+[data-tip-pos="left"]:focus-visible::after {
+	transform: translateY(-50%) translateX(0);
+}
+
 // 5. Left sidebar -----------------------------------------------------------
 
 .nu-sidebar {
@@ -374,17 +452,34 @@ body.nu-chrome .body-sidebar-container {
 	background: var(--control-bg);
 	color: var(--text-color);
 }
+.nu-group-head:focus-visible {
+	outline: none;
+	box-shadow: var(--focus-default);
+}
 .nu-group-head .icon {
 	transition: transform var(--nu-motion-fast, 0.14s) var(--nu-ease, ease);
 }
 .nu-group:not(.nu-collapsed) > .nu-group-head .icon {
 	transform: rotate(90deg);
 }
+// Collapse animates via the grid-rows trick (0fr→1fr on a single clipped
+// inner wrapper) — a natural height transition instead of a display snap.
 .nu-group-items {
+	display: grid;
+	grid-template-rows: 1fr;
+	transition: grid-template-rows var(--nu-motion-med, 0.18s) var(--nu-ease, ease);
+}
+.nu-group-items-inner {
+	overflow: hidden;
+	min-height: 0;
 	padding: 2px 0 2px 8px;
 }
 .nu-group.nu-collapsed > .nu-group-items {
-	display: none;
+	grid-template-rows: 0fr;
+}
+// First paint after a (re)render must not animate — only user toggles should.
+.nu-groups-static .nu-group-items {
+	transition: none;
 }
 
 .nu-sidebar-row {
@@ -419,8 +514,7 @@ a.nu-sidebar-row:hover {
 }
 .nu-sidebar-row:focus-visible {
 	outline: none;
-	box-shadow: inset 0 0 0 1px var(--nu-accent),
-		inset 0 0 0 4px var(--nu-accent-ring-soft);
+	box-shadow: var(--focus-default);
 }
 .nu-sidebar-row.nu-active,
 .nu-sidebar-row.nu-active:hover {

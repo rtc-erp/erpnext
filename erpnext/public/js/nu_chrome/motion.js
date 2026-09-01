@@ -37,6 +37,16 @@ function mark_patched(proto) {
 // Skeleton DOM builders
 // ---------------------------------------------------------------------------
 
+// Column-head row for list/report skeletons: checkbox dot + varied label bars,
+// matching the real list header that leads every result set.
+function head_row_html(cols) {
+	let head = `<div class="nu-skel-row nu-skel-row-head"><span class="nu-skel nu-skel-dot"></span>`;
+	for (let i = 0; i < cols; i++) {
+		head += `<span class="nu-skel nu-skel-bar" style="width:${12 + ((i * 9) % 3) * 4}%"></span>`;
+	}
+	return head + `</div>`;
+}
+
 function rows_html(count) {
 	let rows = "";
 	for (let i = 0; i < count; i++) {
@@ -86,29 +96,33 @@ function form_html() {
 		<span class="nu-skel nu-skel-input"></span>
 	</div>`;
 	const section = (fields) => `<div class="nu-skel-section">${fields}</div>`;
+	// Real forms open with a tab strip above the sections — include it so the
+	// skeleton's outline matches what arrives.
+	const tabs = `<div class="nu-skel-tabs">
+		<span class="nu-skel nu-skel-bar" style="width:58px"></span>
+		<span class="nu-skel nu-skel-bar" style="width:74px"></span>
+		<span class="nu-skel nu-skel-bar" style="width:50px"></span>
+		<span class="nu-skel nu-skel-bar" style="width:66px"></span>
+	</div>`;
 	return (
 		`<div class="nu-skel-form-inner">` +
+		tabs +
 		section(field(38) + field(52) + field(44) + field(60) + field(35) + field(48)) +
-		section(field(45) + field(40) + field(55)) +
+		section(field(45) + field(40) + field(55) + field(36) + field(50) + field(42)) +
 		`</div>`
 	);
 }
 
-function report_html() {
-	let head = `<div class="nu-skel-row nu-skel-row-head">`;
-	for (let i = 0; i < 5; i++) {
-		head += `<span class="nu-skel nu-skel-bar" style="width:${12 + ((i * 9) % 3) * 4}%"></span>`;
-	}
-	head += `</div>`;
-	return `<div class="nu-skel-report-inner">${head}${rows_html(9)}</div>`;
+function report_html(cols) {
+	return `<div class="nu-skel-report-inner">${head_row_html(cols || 5)}${rows_html(9)}</div>`;
 }
 
 const BUILDERS = {
-	rows: () => rows_html(9),
+	rows: (opts = {}) => head_row_html(4) + rows_html(opts.count || 9),
 	kanban: kanban_html,
 	calendar: calendar_html,
 	form: form_html,
-	report: report_html,
+	report: (opts = {}) => report_html(opts.cols),
 };
 
 // ---------------------------------------------------------------------------
@@ -118,11 +132,11 @@ const BUILDERS = {
 // Mount a skeleton layer into $host. Overlays existing content when the host
 // already has height (stale data underneath); sits in-flow when the host is
 // empty so it gives the area height. Returns the layer (empty $() on failure).
-function mount_skeleton($host, kind) {
+function mount_skeleton($host, kind, opts) {
 	if (!$host || !$host.length) return $();
 	$host.find(".nu-skel-layer").remove();
 	const build = BUILDERS[kind] || BUILDERS.rows;
-	const $layer = $(`<div class="nu-skel-layer nu-skel-${kind}">${build()}</div>`);
+	const $layer = $(`<div class="nu-skel-layer nu-skel-${kind}">${build(opts)}</div>`);
 	if ($host.height() < 120) {
 		$layer.addClass("nu-skel-static");
 	} else if ($host.css("position") === "static") {
@@ -220,6 +234,17 @@ class NURouteBar {
 // cached data, forms) rendered into a still-hidden container and could blank
 // the page. Never defer the swap again; keep motion out of the timing path.
 
+// Dismiss the first-load skeleton (2b), if one is mounted. Must run on BOTH
+// skeleton exits: on a fast link the refresh promise settles before the
+// 140ms arm fires, so the arm callback alone is not enough (the first-load
+// skeleton would otherwise stay over the rendered rows until its failsafe).
+function settle_first_skeleton(view) {
+	if (!view.__nu_first_skel) return;
+	clearTimeout(view.__nu_first_failsafe);
+	dismiss_skeleton(view.__nu_first_skel);
+	view.__nu_first_skel = null;
+}
+
 // 2. List-family views (List, Report, Kanban, Calendar, Gantt, Dashboard,
 //    Image, Map): skeleton while the data call is in flight — on first load
 //    and on every refresh (filters, sort, paging, realtime).
@@ -240,16 +265,73 @@ function patch_list_skeletons() {
 		const name = view.view_name || "List";
 		const kind = name === "Kanban" ? "kanban" : name === "Calendar" ? "calendar" : "rows";
 		arm_skeleton(view, () => {
+			// Hand over from the first-load skeleton (2b): dismiss it as this
+			// refresh-phase skeleton takes over — both shimmer rows, so the
+			// transition reads as one continuous loading state.
+			settle_first_skeleton(view);
 			const $host =
 				view.$result && view.$result.length ? view.$result : view.$frappe_list;
 			if (!$host || !$host.is(":visible")) return null;
-			return mount_skeleton($host, kind);
+			// Match the real row count (capped) so the overlay doesn't stretch
+			// far past a short list into empty space.
+			const count = Math.min(Math.max(view.page_length || 20, 3), 10);
+			return mount_skeleton($host, kind, { count });
 		});
 
 		Promise.resolve(result)
 			.catch(() => {})
-			.then(() => settle_skeleton(view));
+			.then(() => {
+				settle_skeleton(view);
+				settle_first_skeleton(view);
+			});
 		return result;
+	};
+}
+
+// 2b. List-family FIRST load: stock's show_skeleton covers the meta-fetch
+//     window with two bare boxes, then hides it — leaving an empty shell
+//     until BaseList.refresh arms our skeleton (~2s of near-blank page on a
+//     slow link). Replace stock's skeleton with the nu rows skeleton so the
+//     page is covered from navigation to data. Repeat visits are untouched:
+//     init is cached and the refresh patch overlays stale rows instead.
+//     CRITICAL: stock show_skeleton hides .layout-main and hide_skeleton
+//     un-hides it — we never hide it, but keep the un-hide in hide_skeleton.
+function patch_listview_first_load() {
+	const proto = frappe.views.ListView && frappe.views.ListView.prototype;
+	if (!proto || !mark_patched(proto)) return;
+
+	proto.show_skeleton = function () {
+		if (this.init_promise) return; // repeat visit — stale rows stay visible
+		const $area =
+			this.parent &&
+			this.parent.page &&
+			this.parent.page.container.find(".page-content");
+		if (!$area || !$area.length || !$area.is(":visible")) return;
+		const name = this.view_name || "List";
+		const kind = name === "Kanban" ? "kanban" : name === "Calendar" ? "calendar" : "rows";
+		const $layer = mount_skeleton($area, kind);
+		if (!$layer || !$layer.length) return;
+		// The host is empty at this point, so mount_skeleton made the layer
+		// in-flow (static). Pin it as a fixed-height overlay instead: layout-
+		// main renders beneath it during init, and the refresh patch settles
+		// it (patch_list_skeletons) — coverage stays continuous without any
+		// in-flow jump.
+		$layer.removeClass("nu-skel-static").addClass("nu-skel-first");
+		if ($area.css("position") === "static") $area.css("position", "relative");
+		this.__nu_first_skel = $layer;
+		clearTimeout(this.__nu_first_failsafe);
+		this.__nu_first_failsafe = setTimeout(() => {
+			this.__nu_first_skel && this.__nu_first_skel.remove();
+			this.__nu_first_skel = null;
+		}, 8000);
+	};
+
+	proto.hide_skeleton = function () {
+		// Deliberately does NOT remove the early skeleton: with meta cached,
+		// the meta window is milliseconds and the real wait is init→refresh.
+		// The refresh patch dismisses it when its own skeleton takes over.
+		// Stock semantics — never drop this (see the codex-editor incident).
+		this.parent.page.container.find(".layout-main").show();
 	};
 }
 
@@ -287,20 +369,51 @@ function patch_form_skeletons() {
 	};
 }
 
-// 4. Query reports: replace the "Loading…" message with a report-shaped
-//    skeleton; crossfade it away when data lands.
+// 4. Query reports: skeleton from the moment the route lands (stock shows a
+//    fully blank page for the first ~2-4s of report/settings roundtrips) and
+//    a report-shaped skeleton in place of the stock "Loading…" message once
+//    the data call starts; crossfade away when data lands.
 function patch_query_report_skeletons() {
 	const proto = frappe.views.QueryReport && frappe.views.QueryReport.prototype;
 	if (!proto || !mark_patched(proto)) return;
 
+	// Early skeleton: cover the blank window between navigation and refresh.
+	// Only when a report will actually (re)load — revisiting the same report
+	// preserves state and renders instantly, so no skeleton there.
+	const orig_show = proto.show;
+	proto.show = function () {
+		const route = frappe.get_route();
+		const will_load =
+			route[0] === "query-report" &&
+			route[1] &&
+			(!this.init_promise || this.report_name !== route[1] || frappe.has_route_options());
+		if (will_load) {
+			arm_skeleton(this, () => {
+				const $area = $(this.parent).find(".page-content");
+				if (!$area.length || !$area.is(":visible")) return null;
+				return mount_skeleton($area, "report");
+			});
+		}
+		return orig_show.apply(this, arguments);
+	};
+
 	proto.show_loading_screen = function () {
+		// The early skeleton (if any) hands over here — both report-shaped, so
+		// the transition reads as the skeleton settling into place.
+		settle_skeleton(this);
+		const cols =
+			this.columns && this.columns.length
+				? Math.min(Math.max(this.columns.length, 4), 8)
+				: 5;
 		this.$loading
-			.html(`<div class="nu-skel-layer nu-skel-static nu-skel-report">${report_html()}</div>`)
+			.html(`<div class="nu-skel-layer nu-skel-static nu-skel-report">${report_html(cols)}</div>`)
 			.show();
 		// Failsafe: if the report call fails (4xx/5xx), stock never calls
 		// hide_loading_screen (the refresh promise's callback only fires on
-		// success) — don't leave an opaque skeleton over the page. Re-arms
-		// while requests are genuinely still in flight (slow reports).
+		// success) — don't leave an opaque skeleton over the page. Polls:
+		// while requests are genuinely in flight (slow reports) it re-arms;
+		// once the network settles without a success it dismisses quickly
+		// instead of leaving the skeleton up for seconds after the failure.
 		const arm_failsafe = () => {
 			clearTimeout(this.__nu_loading_failsafe);
 			this.__nu_loading_failsafe = setTimeout(() => {
@@ -309,7 +422,7 @@ function patch_query_report_skeletons() {
 				} else {
 					this.hide_loading_screen();
 				}
-			}, 8000);
+			}, 1500);
 		};
 		arm_failsafe();
 	};
@@ -472,6 +585,7 @@ function arm_workspace_watchdog() {
 
 function init_motion() {
 	patch_list_skeletons();
+	patch_listview_first_load();
 	patch_form_skeletons();
 	patch_query_report_skeletons();
 	patch_workspace_skeletons();

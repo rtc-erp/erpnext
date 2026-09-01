@@ -70,8 +70,8 @@
 
 	// Inputs
 	--nu-input-focus-bg: #ffffff;
-	--skeleton-bg: #eceef2;
-	--nu-skel-sheen: #f8f9fb;
+	--skeleton-bg: #e4e8ee;
+	--nu-skel-sheen: #f6f8fa;
 
 	// Accent-driven controls
 	--checkbox-color: var(--nu-accent);
@@ -135,8 +135,8 @@
 	--checkbox-focus-shadow: var(--focus-default);
 
 	--nu-input-focus-bg: #1b1f26;
-	--skeleton-bg: #22262d;
-	--nu-skel-sheen: #2b313a;
+	--skeleton-bg: #262b34;
+	--nu-skel-sheen: #313842;
 
 	--checkbox-color: var(--nu-accent);
 	--progress-bar-bg: var(--nu-accent);
@@ -415,6 +415,43 @@ body:not(.full-width) [data-page-route="Workspaces"] .layout-main {
 
 	&:hover {
 		background-color: var(--control-bg);
+	}
+}
+
+@keyframes nu-spin {
+	to {
+		transform: rotate(360deg);
+	}
+}
+
+// Inline button loading: the label stays laid out (width preserved, no jump)
+// but invisible, with a spinner centered over it.
+.btn.btn-loading {
+	position: relative;
+	color: transparent !important;
+	pointer-events: none;
+
+	.icon,
+	svg {
+		visibility: hidden;
+	}
+
+	&::after {
+		content: "";
+		position: absolute;
+		inset: 0;
+		margin: auto;
+		width: 14px;
+		height: 14px;
+		border-radius: 50%;
+		border: 2px solid var(--nu-accent-ring);
+		border-top-color: var(--nu-accent);
+		animation: nu-spin 0.7s linear infinite;
+	}
+
+	&.btn-primary::after {
+		border-color: rgba(255, 255, 255, 0.35);
+		border-top-color: var(--nu-accent-foreground);
 	}
 }
 
@@ -734,6 +771,62 @@ input[type="checkbox"] {
 	}
 }
 
+// -- Widget loading states ----------------------------------------------------
+
+// Number cards swap their whole body when data arrives (no height reserved),
+// which made the card row oscillate while loading. Reserve the settled
+// height and let the loading text fade instead of popping.
+.widget.number-widget-box {
+	.widget-body {
+		min-height: 62px;
+		display: flex;
+		align-items: center;
+	}
+
+	.number-card-loading {
+		animation: nu-fade-in var(--nu-motion-med) var(--nu-ease);
+	}
+}
+
+// Chart widgets: stock reserves only the chart div (240px) before the widget
+// head renders, so the whole box grows ~59px at mount and shoves everything
+// below it down. Floor the box at its settled height (240 chart + 59 chrome)
+// so the loading geometry equals the final geometry. Heatmaps are shorter —
+// leave them to stock's own reservation.
+.widget.dashboard-widget-box:not(.heatmap-chart) {
+	min-height: 299px;
+}
+
+// Chart widgets: stock reserves the chart height via .chart-loading-state but
+// renders it as an empty white card with bare "Loading…" text. Give the
+// loading body the skeleton treatment so it reads as a chart arriving, and
+// keep the reserved height so nothing below shifts when the SVG mounts.
+.widget .chart-loading-state,
+.widget .chart-no-data-state {
+	display: flex;
+	align-items: center;
+	justify-content: center;
+	color: var(--text-muted);
+	background: var(--card-bg);
+	border-radius: var(--border-radius-md);
+	position: relative;
+	overflow: hidden;
+
+	&::after {
+		content: "";
+		position: absolute;
+		inset: 0;
+		background: linear-gradient(
+			100deg,
+			transparent 20%,
+			var(--nu-skel-sheen) 50%,
+			transparent 80%
+		);
+		transform: translateX(-100%);
+		animation: nu-skel-sheen 1.4s var(--nu-ease) infinite;
+	}
+}
+
 // ---------------------------------------------------------------------------
 // 10. Form view
 // ---------------------------------------------------------------------------
@@ -754,6 +847,13 @@ input[type="checkbox"] {
 			font-weight: var(--weight-medium);
 			color: var(--text-neutral);
 			border-bottom: 2px solid var(--nu-accent);
+		}
+
+		// Stock strips the focus ring down to a font-weight bump — keyboard
+		// users need the same deliberate ring every other control gets.
+		&:focus-visible {
+			outline: none;
+			box-shadow: var(--focus-default);
 		}
 	}
 }
@@ -904,10 +1004,41 @@ input[type="checkbox"] {
 // 12. Alerts & toasts
 // ---------------------------------------------------------------------------
 
+// Stock toasts bounce in over 600ms (backInRight with a scale overshoot) and
+// slide out over 1.6s — both fight the 0.12–0.25s language everywhere else.
+// Replace with a quiet slide+fade. The exit must finish well inside stock's
+// 800ms removal timer (messages.js).
 .desk-alert {
 	border-radius: var(--border-radius-md);
 	box-shadow: var(--modal-shadow);
 	border: 1px solid var(--border-color);
+	animation: nu-toast-in 0.24s cubic-bezier(0.16, 1, 0.3, 1) both;
+
+	&.out {
+		animation: nu-toast-out 0.26s var(--nu-ease) both;
+	}
+}
+
+@keyframes nu-toast-in {
+	from {
+		opacity: 0;
+		transform: translateX(16px);
+	}
+	to {
+		opacity: 1;
+		transform: none;
+	}
+}
+
+@keyframes nu-toast-out {
+	from {
+		opacity: 1;
+		transform: none;
+	}
+	to {
+		opacity: 0;
+		transform: translateX(12px);
+	}
 }
 
 .alert {
@@ -926,6 +1057,24 @@ input[type="checkbox"] {
 
 	&:focus-within {
 		box-shadow: 0 0 0 1px var(--nu-accent), 0 0 0 4px var(--nu-accent-ring-soft);
+	}
+}
+
+// The awesomebar dialog removes Bootstrap's .fade (instant class toggles), so
+// it was the one modal with no entry motion. Give it the same quiet rise as
+// every other overlay — keyframes, since there is no transition to ride on.
+.modal:has(.navbar-modal-wrapper).show .modal-dialog {
+	animation: nu-modal-in 0.18s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+@keyframes nu-modal-in {
+	from {
+		opacity: 0;
+		transform: translateY(-8px);
+	}
+	to {
+		opacity: 1;
+		transform: none;
 	}
 }
 
@@ -1367,10 +1516,18 @@ body.nu-chrome .page-container {
 	inset: 0;
 	z-index: 5;
 	background: var(--card-bg);
+	overflow: hidden; // taller skeleton content clips instead of spilling
 	animation: nu-skel-layer-in 0.16s ease-out;
 
 	&.nu-skel-static {
 		position: static;
+	}
+
+	// First-load list skeleton: host is still empty, so it can't be sized by
+	// inset — fixed height instead, pinned to the top of the content area.
+	&.nu-skel-first {
+		bottom: auto;
+		height: 420px;
 	}
 
 	&.nu-skel-out {
@@ -1380,12 +1537,13 @@ body.nu-chrome .page-container {
 	}
 }
 
-// Rows (list / report family)
+// Rows (list / report family) — 40px matches the real list row height (~41px
+// including its border) so the skeleton doesn't shrink the area on settle.
 .nu-skel-row {
 	display: flex;
 	align-items: center;
 	gap: 18px;
-	height: 44px;
+	height: 40px;
 	padding: 0 16px;
 	border-bottom: 1px solid var(--table-border-color);
 	animation: nu-row-in 0.3s cubic-bezier(0.16, 1, 0.3, 1) backwards;
@@ -1418,8 +1576,25 @@ body.nu-chrome .page-container {
 }
 
 .nu-skel-row-head {
+	height: 32px; // real list header is shorter than a data row
+
 	.nu-skel-pill {
 		display: none;
+	}
+}
+
+// Form skeleton tab strip (real forms open with tabs above the sections).
+.nu-skel-tabs {
+	display: flex;
+	align-items: center;
+	gap: 22px;
+	height: 34px;
+	padding: 0 4px;
+	margin-bottom: 14px;
+	border-bottom: 1px solid var(--table-border-color);
+
+	.nu-skel-bar {
+		height: 9px;
 	}
 }
 
@@ -1553,6 +1728,17 @@ body.nu-chrome .page-container {
 		opacity: 0;
 		transition: opacity 0.22s ease;
 		pointer-events: none;
+	}
+
+	// Stock's shortcut placeholders are much taller than real shortcut rows
+	// (~60px vs ~43px), so the page collapses when content lands. Match the
+	// real geometry instead.
+	.shortcut-widget-box.skeleton-card {
+		height: 44px;
+	}
+
+	.links-widget-box.skeleton-card {
+		height: 180px;
 	}
 }
 
