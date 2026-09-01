@@ -1,0 +1,271 @@
+// ---------------------------------------------------------------------------
+// NU Login — brand elevation for the stock frappe auth pages
+// (login / signup / forgot / email-link / reset-password).
+//
+// Loaded through erpnext-web.bundle.css (web_include_css). frappe's own
+// login.bundle.css is included AFTER us (head_include block comes after the
+// head block), and its rules are deeply nested (e.g.
+// `.for-login .page-card .page-card-actions .btn-login` = 4 class-level).
+// Every override below therefore nests the full section → card chain under
+// `body[data-path=...]` (5 class-level) so our rules win without !important
+// and without touching the frappe fork.
+//
+// The desk nu_ui tokens are not available on web pages — this file defines
+// its own small token set, aligned with the desk's orange accent family.
+// ---------------------------------------------------------------------------
+
+body[data-path="login"],
+body[data-path="update-password"] {
+	// -- Local auth tokens (mirror of the desk accent roles) ------------------
+	--nu-auth-accent: #ea6c0c;
+	--nu-auth-accent-contrast: #c2410c; // 5.1:1 AA with white text
+	--nu-auth-accent-contrast-hover: #9a3412;
+	--nu-auth-accent-soft: rgba(234, 108, 12, 0.09);
+	--nu-auth-ring: rgba(234, 108, 12, 0.22);
+
+	--nu-auth-bg: #faf9f7; // warm page canvas
+	--nu-auth-card-bg: #ffffff;
+	--nu-auth-card-border: #e9e6e1; // warm hairline
+	--nu-auth-card-shadow:
+		0 1px 2px rgba(28, 25, 23, 0.04),
+		0 8px 28px rgba(28, 25, 23, 0.07);
+
+	--nu-auth-input-bg: #fafaf9;
+	--nu-auth-input-border: #e7e5e4;
+	--nu-auth-input-border-hover: #d6d3d1;
+	--nu-auth-ink: #1c1917;
+	--nu-auth-ink-2: #57534e;
+	--nu-auth-ink-3: #78716c;
+	--nu-auth-ink-4: #a8a29e;
+
+	// Warm canvas with a restrained brand glow near the top.
+	background-color: var(--nu-auth-bg);
+	background-image: radial-gradient(
+		ellipse 720px 340px at 50% -60px,
+		rgba(234, 108, 12, 0.06),
+		transparent 70%
+	);
+	background-repeat: no-repeat;
+
+	// -----------------------------------------------------------------------
+	.for-login,
+	.for-signup,
+	.for-forgot,
+	.for-reset-password,
+	.for-login-with-email-link,
+	.for-email-login {
+		// -- Card -------------------------------------------------------------
+		.page-card {
+			background-color: var(--nu-auth-card-bg);
+			border: 1px solid var(--nu-auth-card-border);
+			border-radius: 12px;
+			box-shadow: var(--nu-auth-card-shadow);
+			padding: 32px;
+			animation: nu-auth-enter 0.32s cubic-bezier(0.2, 0.7, 0.3, 1) both;
+		}
+
+		// -- Logo + headings ---------------------------------------------------
+		.page-card-head {
+			gap: 20px;
+
+			img.app-logo {
+				max-height: 40px;
+				border-radius: 9px;
+			}
+
+			h4 {
+				color: var(--nu-auth-ink);
+				letter-spacing: -0.01em;
+			}
+
+			.page-card-subtitle {
+				color: var(--nu-auth-ink-3);
+			}
+		}
+
+		// -- Form fields ---------------------------------------------------------
+		.page-card-body {
+			.form-label {
+				color: var(--nu-auth-ink-2);
+				font-weight: 500;
+			}
+
+			input[type="text"],
+			input[type="email"],
+			input[type="password"] {
+				height: 34px;
+				padding: 7px 10px;
+				background-color: var(--nu-auth-input-bg);
+				border: 1px solid var(--nu-auth-input-border);
+				border-radius: 8px;
+				transition:
+					border-color 120ms ease,
+					box-shadow 120ms ease,
+					background-color 120ms ease;
+
+				&:hover {
+					border-color: var(--nu-auth-input-border-hover);
+				}
+
+				&:focus {
+					outline: none;
+					background-color: #ffffff;
+					border-color: var(--nu-auth-accent);
+					box-shadow: 0 0 0 3px var(--nu-auth-ring);
+				}
+			}
+
+			// Keep the icon padding stock set; just soften the icon color.
+			.field-icon,
+			.toggle-password {
+				fill: var(--nu-auth-ink-4);
+			}
+
+			.email-field input,
+			.password-field input {
+				padding-left: 38px;
+			}
+
+			.password-field input {
+				padding-right: 38px;
+			}
+
+			.forgot-password-message > * {
+				color: var(--nu-auth-accent-contrast);
+				transition: color 120ms ease;
+
+				&:hover {
+					color: var(--nu-auth-accent-contrast-hover);
+				}
+			}
+		}
+
+		// -- Actions -------------------------------------------------------------
+		.page-card-actions {
+			// Primary action ("Continue", LDAP, email-link submit) carries the brand.
+			.btn-login,
+			.btn-ldap-login,
+			.btn-signup:not(:disabled) {
+				background: var(--nu-auth-accent-contrast);
+				color: #ffffff;
+				font-weight: 500;
+				padding: 8px;
+				border: none;
+				border-radius: 8px;
+				box-shadow: 0 1px 2px rgba(154, 52, 18, 0.28);
+				transition:
+					background-color 120ms ease,
+					box-shadow 120ms ease;
+
+				&:hover,
+				&:focus {
+					background: var(--nu-auth-accent-contrast-hover);
+					color: #ffffff;
+					box-shadow: 0 1px 2px rgba(154, 52, 18, 0.28);
+				}
+
+				&:focus-visible {
+					outline: none;
+					box-shadow:
+						0 1px 2px rgba(154, 52, 18, 0.28),
+						0 0 0 3px var(--nu-auth-ring);
+				}
+
+				&:active {
+					background: var(--nu-auth-accent-contrast-hover);
+					box-shadow: none;
+				}
+			}
+
+			.btn-login:disabled,
+			.btn-ldap-login:disabled {
+				background: var(--nu-auth-accent-contrast);
+				opacity: 0.55;
+			}
+
+			// Secondary options (email link, social providers): quiet outlined neutral.
+			.btn-login-option {
+				background: var(--nu-auth-card-bg);
+				border: 1px solid var(--nu-auth-input-border);
+				color: var(--nu-auth-ink-2);
+				font-weight: 500;
+				padding: 8px;
+				border-radius: 8px;
+				transition:
+					border-color 120ms ease,
+					background-color 120ms ease,
+					color 120ms ease;
+
+				&:hover,
+				&:focus {
+					background: var(--nu-auth-input-bg);
+					border-color: var(--nu-auth-input-border-hover);
+					color: var(--nu-auth-ink);
+				}
+
+				&:focus-visible {
+					outline: none;
+					border-color: var(--nu-auth-accent);
+					box-shadow: 0 0 0 3px var(--nu-auth-ring);
+				}
+			}
+
+			.resend-link a {
+				color: var(--nu-auth-accent-contrast);
+
+				&:hover {
+					color: var(--nu-auth-accent-contrast-hover);
+				}
+			}
+		}
+
+		// -- Footer links -----------------------------------------------------------
+		.sign-up-message {
+			color: var(--nu-auth-ink-3);
+
+			a {
+				color: var(--nu-auth-accent-contrast);
+				font-weight: 500;
+				transition: color 120ms ease;
+
+				&:hover {
+					color: var(--nu-auth-accent-contrast-hover);
+				}
+			}
+		}
+
+		// -- Small screens: stock goes full-bleed; keep our surface language ---------
+		@media (max-width: 575.98px) {
+			.page-card {
+				border: none;
+				border-radius: 0;
+				box-shadow: none;
+				background-color: var(--nu-auth-bg);
+				background-image: radial-gradient(
+					ellipse 480px 260px at 50% -40px,
+					rgba(234, 108, 12, 0.07),
+					transparent 70%
+				);
+				background-repeat: no-repeat;
+			}
+		}
+
+		// -- Reduced motion ------------------------------------------------------------
+		@media (prefers-reduced-motion: reduce) {
+			.page-card {
+				animation: none;
+			}
+		}
+	}
+}
+
+@keyframes nu-auth-enter {
+	from {
+		opacity: 0;
+		transform: translateY(10px);
+	}
+	to {
+		opacity: 1;
+		transform: none;
+	}
+}
