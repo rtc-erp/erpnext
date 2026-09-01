@@ -601,6 +601,46 @@ input[type="checkbox"] {
 	}
 }
 
+// The actual stock markup is .no-result > .msg-box (list, report, kanban…).
+// Keep it quiet and simple per the brief — no illustration, just comfortable
+// spacing, readable copy, and one clearly branded next step.
+.no-result {
+	padding: var(--padding-2xl) var(--padding-md);
+
+	.msg-box {
+		svg.icon {
+			opacity: 0.55;
+		}
+
+		> p {
+			font-size: var(--text-base);
+			line-height: 1.5;
+			color: var(--text-muted);
+			max-width: 48ch;
+			margin-left: auto;
+			margin-right: auto;
+		}
+	}
+
+	// The empty state's call to action carries a soft accent, not the heavy
+	// primary fill — the context is "nothing here yet", not a committed task.
+	.btn-new-doc.btn-default {
+		background-color: var(--nu-accent-soft);
+		color: var(--nu-accent-contrast);
+		border-color: transparent;
+		box-shadow: none;
+		font-weight: var(--weight-medium);
+		transition: background-color var(--nu-motion-fast) var(--nu-ease),
+			color var(--nu-motion-fast) var(--nu-ease);
+
+		&:hover,
+		&:focus {
+			background-color: var(--nu-accent-muted);
+			color: var(--nu-accent-contrast-hover);
+		}
+	}
+}
+
 // Skeletons shimmer on the themed token (full shimmer treatment in §19).
 .list-skeleton-box,
 .workspace-skeleton .skeleton-card {

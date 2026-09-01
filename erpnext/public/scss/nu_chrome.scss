@@ -582,6 +582,31 @@ body.nu-chrome .desktop-navbar.navbar-container {
 	}
 }
 
+// 7b. Desktop icon grid: full module labels -----------------------------------
+// Stock clamps every caption to one line with an ellipsis ("Manufactur…",
+// "Subcontrac…"). Widen the caption box inside the 127px column and let
+// labels wrap to two quiet lines instead — the /desk grid is the product's
+// front door, and truncated brand names read as unfinished. No word-break:
+// 112px fits "Subcontracting" (the longest label) at the stock 14px.
+
+body.nu-chrome .desktop-icon .icon-caption {
+	width: 112px;
+}
+
+body.nu-chrome .desktop-icon .icon-caption .icon-title {
+	width: auto;
+	max-width: 112px;
+	margin-left: auto;
+	margin-right: auto;
+	white-space: normal;
+	display: -webkit-box;
+	-webkit-line-clamp: 2;
+	-webkit-box-orient: vertical;
+	overflow: hidden;
+	line-height: 1.25;
+	text-align: center;
+}
+
 // 6. Small screens: sidebar becomes an overlay drawer ------------------------
 
 @media (max-width: 992px) {
