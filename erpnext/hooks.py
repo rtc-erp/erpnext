@@ -7,7 +7,7 @@ app_color = "#e74c3c"
 app_email = "hello@frappe.io"
 app_license = "GNU General Public License (v3)"
 source_link = "https://github.com/frappe/erpnext"
-app_logo_url = "/assets/erpnext/images/erpnext-logo.svg"
+app_logo_url = "/assets/erpnext/images/nu-login-logo.svg"
 app_home = "/desk"
 
 add_to_apps_screen = [
