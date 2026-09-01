@@ -82,13 +82,32 @@ class NUChrome {
 		if (!title) return;
 		const key = title.toLowerCase();
 
-		const pinned = resolved_pinned().find((m) => m.sidebar_key === key);
+		// Which pinned tab owns this sidebar? Primary resolution first, then
+		// ANY alternate key the module claims (sidebar_keys): the Accounting
+		// tab's own sidebar resolves to "invoicing" on this site, but stock
+		// resolves pages like /desk/account to the "accounts" sidebar — an
+		// alternate key of the same module. Without the claim lookup the page
+		// fell into the More branch: More selected, no label, wrong owner.
+		let pinned = resolved_pinned().find((m) => m.sidebar_key === key);
+		let alt_key = null;
+		if (!pinned) {
+			const claimant = resolved_pinned().find((m) => (m.sidebar_keys || []).includes(key));
+			if (claimant) {
+				pinned = claimant;
+				alt_key = key;
+			}
+		}
+
 		if (pinned) {
+			const data_key = alt_key || pinned.sidebar_key;
 			// Skip the re-render when the route stayed inside the same sidebar —
 			// only the active row changes (handled by sync_active below).
-			if (!(this.active && this.active.kind === "pinned" && this.active.key === pinned.key)) {
-				this.show_pinned(pinned);
-			}
+			const same =
+				this.active &&
+				this.active.kind === "pinned" &&
+				this.active.key === pinned.key &&
+				this.active.data_key === data_key;
+			if (!same) this.show_pinned(pinned, alt_key);
 		} else {
 			const extra = more_sidebars().find((m) => m.key === key);
 			if (extra) {
@@ -129,20 +148,29 @@ class NUChrome {
 
 	// -- rendering ----------------------------------------------------------
 
-	show_pinned(pinned) {
+	show_pinned(pinned, alt_key) {
+		// alt_key: the page resolved to an ALTERNATE sidebar this module claims
+		// (e.g. "accounts" when the module's own sidebar is "invoicing"). Render
+		// the sidebar stock would actually show for this route, but keep the
+		// owning pinned tab highlighted.
+		const data_key = alt_key || pinned.sidebar_key;
+		const data = alt_key ? get_sidebars()[alt_key] : pinned.data;
 		this.active = {
 			kind: "pinned",
 			key: pinned.key,
 			storage_key: pinned.key,
-			title: pinned.label,
-			data: pinned.data,
+			title: (data && data.label) || pinned.label,
+			data,
+			data_key,
 		};
 		this.topbar.set_active(pinned.key);
 		this.sidebar.show(
 			this.active.title,
-			pinned.data.header_icon || pinned.icon,
-			group_items(pinned.data.items),
-			pinned.key
+			(data && data.header_icon) || pinned.icon,
+			group_items(data.items),
+			// Group-collapse state is per sidebar, not per tab, so alternate
+			// sidebars don't share collapse memory with the module's own one.
+			data_key || pinned.key
 		);
 	}
 
