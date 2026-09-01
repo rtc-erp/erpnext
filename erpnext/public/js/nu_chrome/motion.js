@@ -129,19 +129,20 @@ const BUILDERS = {
 // Skeleton layer mount/dismiss
 // ---------------------------------------------------------------------------
 
-// Mount a skeleton layer into $host. Overlays existing content when the host
-// already has height (stale data underneath); sits in-flow when the host is
-// empty so it gives the area height. Returns the layer (empty $() on failure).
+// Mount a skeleton layer into $host. Always an overlay: full inset when the
+// host has height (stale data underneath); pinned to the top with a fixed
+// height when the host is short/empty. NEVER in-flow — an in-flow skeleton
+// pushes later-rendered content down and its removal snaps it back up (the
+// 400px form/report jump). Returns the layer (empty $() on failure).
 function mount_skeleton($host, kind, opts) {
 	if (!$host || !$host.length) return $();
 	$host.find(".nu-skel-layer").remove();
 	const build = BUILDERS[kind] || BUILDERS.rows;
 	const $layer = $(`<div class="nu-skel-layer nu-skel-${kind}">${build(opts)}</div>`);
-	if ($host.height() < 120) {
-		$layer.addClass("nu-skel-static");
-	} else if ($host.css("position") === "static") {
-		$host.css("position", "relative");
-	}
+	if ($host.css("position") === "static") $host.css("position", "relative");
+	// An inset-sized layer in a sub-120px host would collapse to nothing —
+	// clip it to a fixed height pinned at the host's top instead.
+	if ($host.height() < 120) $layer.addClass("nu-skel-clip");
 	$host.prepend($layer);
 	return $layer;
 }
@@ -155,23 +156,43 @@ function dismiss_skeleton($layer) {
 	setTimeout(() => $layer.remove(), OUT_MS);
 }
 
-// Per-instance skeleton handle: arms a delayed show, cancels+dismisses on settle.
+// Per-instance skeleton handle: arms a delayed show, cancels+dismisses on
+// settle. Each arm gets a sequence number so stale arms/settles can't act out
+// of order (the late-skeleton fix):
+//   - if a skeleton is ALREADY UP when re-armed (a second refresh/form-load
+//     for the same load), keep it — dismissing it and re-delaying read as a
+//     blink; the next settle drops it. One load = one continuous skeleton.
+//   - when the arm timer fires, bail if that arm was already settled: the
+//     data beat the show-delay, so mounting now would flash a skeleton over
+//     loaded content.
+// Returns the arm's sequence number; pass it to settle_skeleton so a stale
+// refresh resolving late can't drop a newer load's skeleton.
 function arm_skeleton(store, show) {
 	clearTimeout(store.__nu_skel_timer);
 	clearTimeout(store.__nu_skel_failsafe);
-	dismiss_skeleton(store.__nu_skel);
+	store.__nu_arm_seq = (store.__nu_arm_seq || 0) + 1;
+	const seq = store.__nu_arm_seq;
+	if (store.__nu_skel && store.__nu_skel.parent().length) {
+		// Skeleton already visible — keep it, just extend the failsafe.
+		store.__nu_skel_failsafe = setTimeout(() => settle_skeleton(store), 8000);
+		return seq;
+	}
 	store.__nu_skel = null;
 	store.__nu_skel_timer = setTimeout(() => {
 		store.__nu_skel_timer = null;
+		if (store.__nu_settled_seq === seq) return; // data beat the show-delay
 		store.__nu_skel = show() || null;
 		if (store.__nu_skel) {
 			// Failsafe: never leave a skeleton stuck on screen.
 			store.__nu_skel_failsafe = setTimeout(() => settle_skeleton(store), 8000);
 		}
 	}, SHOW_DELAY);
+	return seq;
 }
 
-function settle_skeleton(store) {
+function settle_skeleton(store, seq) {
+	if (seq != null && seq !== store.__nu_arm_seq) return; // a newer load owns it
+	store.__nu_settled_seq = store.__nu_arm_seq;
 	clearTimeout(store.__nu_skel_timer);
 	clearTimeout(store.__nu_skel_failsafe);
 	store.__nu_skel_timer = null;
@@ -234,11 +255,14 @@ class NURouteBar {
 // cached data, forms) rendered into a still-hidden container and could blank
 // the page. Never defer the swap again; keep motion out of the timing path.
 
-// Dismiss the first-load skeleton (2b), if one is mounted. Must run on BOTH
-// skeleton exits: on a fast link the refresh promise settles before the
-// 140ms arm fires, so the arm callback alone is not enough (the first-load
-// skeleton would otherwise stay over the rendered rows until its failsafe).
+// Dismiss the first-load skeleton (2b), if one is mounted, and cancel a
+// pending deferred mount. Must run on BOTH skeleton exits: on a fast link the
+// refresh promise settles before the 140ms arm fires, so the arm callback
+// alone is not enough (the first-load skeleton would otherwise stay over the
+// rendered rows until its failsafe).
 function settle_first_skeleton(view) {
+	clearTimeout(view.__nu_first_timer);
+	view.__nu_first_timer = null;
 	if (!view.__nu_first_skel) return;
 	clearTimeout(view.__nu_first_failsafe);
 	dismiss_skeleton(view.__nu_first_skel);
@@ -264,11 +288,17 @@ function patch_list_skeletons() {
 
 		const name = view.view_name || "List";
 		const kind = name === "Kanban" ? "kanban" : name === "Calendar" ? "calendar" : "rows";
-		arm_skeleton(view, () => {
-			// Hand over from the first-load skeleton (2b): dismiss it as this
-			// refresh-phase skeleton takes over — both shimmer rows, so the
-			// transition reads as one continuous loading state.
-			settle_first_skeleton(view);
+		const seq = arm_skeleton(view, () => {
+			// Adopt the first-load skeleton (2b) instead of dismissing it and
+			// mounting a second one elsewhere: the old dismiss+remount swapped
+			// skeleton geometry mid-load, which read as a blink. One continuous
+			// skeleton from navigation to data.
+			if (view.__nu_first_skel && view.__nu_first_skel.parent().length) {
+				const adopted = view.__nu_first_skel;
+				view.__nu_first_skel = null;
+				clearTimeout(view.__nu_first_failsafe);
+				return adopted;
+			}
 			const $host =
 				view.$result && view.$result.length ? view.$result : view.$frappe_list;
 			if (!$host || !$host.is(":visible")) return null;
@@ -281,8 +311,12 @@ function patch_list_skeletons() {
 		Promise.resolve(result)
 			.catch(() => {})
 			.then(() => {
-				settle_skeleton(view);
+				settle_skeleton(view, seq);
 				settle_first_skeleton(view);
+				// Rows re-render on every refresh; the entry cascade is a
+				// first-render delight only — replaying it on each refresh /
+				// realtime update read as blinking. CSS gates on .nu-rendered.
+				if (view.$frappe_list) view.$frappe_list.addClass("nu-rendered");
 			});
 		return result;
 	};
@@ -294,6 +328,10 @@ function patch_list_skeletons() {
 //     slow link). Replace stock's skeleton with the nu rows skeleton so the
 //     page is covered from navigation to data. Repeat visits are untouched:
 //     init is cached and the refresh patch overlays stale rows instead.
+//     The mount is deferred by SHOW_DELAY like every other skeleton: on a
+//     fast link the data beats the delay and settle_first_skeleton cancels
+//     the timer — an instant first load must not flash a skeleton over
+//     content that is already there.
 //     CRITICAL: stock show_skeleton hides .layout-main and hide_skeleton
 //     un-hides it — we never hide it, but keep the un-hide in hide_skeleton.
 function patch_listview_first_load() {
@@ -302,35 +340,38 @@ function patch_listview_first_load() {
 
 	proto.show_skeleton = function () {
 		if (this.init_promise) return; // repeat visit — stale rows stay visible
-		const $area =
-			this.parent &&
-			this.parent.page &&
-			this.parent.page.container.find(".page-content");
-		if (!$area || !$area.length || !$area.is(":visible")) return;
-		const name = this.view_name || "List";
-		const kind = name === "Kanban" ? "kanban" : name === "Calendar" ? "calendar" : "rows";
-		const $layer = mount_skeleton($area, kind);
-		if (!$layer || !$layer.length) return;
-		// The host is empty at this point, so mount_skeleton made the layer
-		// in-flow (static). Pin it as a fixed-height overlay instead: layout-
-		// main renders beneath it during init, and the refresh patch settles
-		// it (patch_list_skeletons) — coverage stays continuous without any
-		// in-flow jump.
-		$layer.removeClass("nu-skel-static").addClass("nu-skel-first");
-		if ($area.css("position") === "static") $area.css("position", "relative");
-		this.__nu_first_skel = $layer;
-		clearTimeout(this.__nu_first_failsafe);
-		this.__nu_first_failsafe = setTimeout(() => {
-			this.__nu_first_skel && this.__nu_first_skel.remove();
-			this.__nu_first_skel = null;
-		}, 8000);
+		clearTimeout(this.__nu_first_timer);
+		this.__nu_first_timer = setTimeout(() => {
+			this.__nu_first_timer = null;
+			const $area =
+				this.parent &&
+				this.parent.page &&
+				this.parent.page.container.find(".page-content");
+			if (!$area || !$area.length || !$area.is(":visible")) return;
+			const name = this.view_name || "List";
+			const kind = name === "Kanban" ? "kanban" : name === "Calendar" ? "calendar" : "rows";
+			const $layer = mount_skeleton($area, kind);
+			if (!$layer || !$layer.length) return;
+			// The host is empty at this point, so mount_skeleton clipped the
+			// layer to a fixed height pinned at the top (nu-skel-clip). Tag it
+			// as the first-load skeleton: the refresh patch adopts it as its
+			// own (patch_list_skeletons) — coverage stays continuous with no
+			// dismiss/remount blink at the handoff.
+			$layer.removeClass("nu-skel-clip").addClass("nu-skel-first");
+			this.__nu_first_skel = $layer;
+			clearTimeout(this.__nu_first_failsafe);
+			this.__nu_first_failsafe = setTimeout(() => {
+				this.__nu_first_skel && this.__nu_first_skel.remove();
+				this.__nu_first_skel = null;
+			}, 8000);
+		}, SHOW_DELAY);
 	};
 
 	proto.hide_skeleton = function () {
 		// Deliberately does NOT remove the early skeleton: with meta cached,
 		// the meta window is milliseconds and the real wait is init→refresh.
-		// The refresh patch dismisses it when its own skeleton takes over.
-		// Stock semantics — never drop this (see the codex-editor incident).
+		// The refresh patch adopts it as its own skeleton (or dismisses it on
+		// settle). Stock semantics — never drop this (the codex-editor incident).
 		this.parent.page.container.find(".layout-main").show();
 	};
 }
@@ -398,16 +439,6 @@ function patch_query_report_skeletons() {
 	};
 
 	proto.show_loading_screen = function () {
-		// The early skeleton (if any) hands over here — both report-shaped, so
-		// the transition reads as the skeleton settling into place.
-		settle_skeleton(this);
-		const cols =
-			this.columns && this.columns.length
-				? Math.min(Math.max(this.columns.length, 4), 8)
-				: 5;
-		this.$loading
-			.html(`<div class="nu-skel-layer nu-skel-static nu-skel-report">${report_html(cols)}</div>`)
-			.show();
 		// Failsafe: if the report call fails (4xx/5xx), stock never calls
 		// hide_loading_screen (the refresh promise's callback only fires on
 		// success) — don't leave an opaque skeleton over the page. Polls:
@@ -425,11 +456,26 @@ function patch_query_report_skeletons() {
 			}, 1500);
 		};
 		arm_failsafe();
+		// The early skeleton (if one is up) IS the loading screen — keep it
+		// until hide_loading_screen settles it. The old handover dismissed it
+		// and mounted a second skeleton in $loading: two shapes swapping
+		// position mid-load, which read as a blink (and the in-flow mount
+		// jumped the page). One load = one continuous skeleton.
+		if (this.__nu_skel && this.__nu_skel.parent().length) return;
+		settle_skeleton(this);
+		const cols =
+			this.columns && this.columns.length
+				? Math.min(Math.max(this.columns.length, 4), 8)
+				: 5;
+		this.$loading
+			.html(`<div class="nu-skel-layer nu-skel-static nu-skel-report">${report_html(cols)}</div>`)
+			.show();
 	};
 
 	proto.hide_loading_screen = function () {
 		clearTimeout(this.__nu_loading_failsafe);
 		this.__nu_loading_failsafe = null;
+		settle_skeleton(this); // drops an adopted early skeleton, if any
 		const $loading = this.$loading;
 		if (!$loading || !$loading.is(":visible")) return;
 		const $layer = $loading.find(".nu-skel-layer");
@@ -451,6 +497,17 @@ function patch_workspace_skeletons() {
 	const proto = frappe.views.Workspace && frappe.views.Workspace.prototype;
 	if (!proto || !mark_patched(proto)) return;
 	const orig_remove = proto.remove_page_skeleton;
+	const orig_create = proto.create_page_skeleton;
+
+	// Stock mounts the skeleton unconditionally — even on cached page
+	// switches, where create+remove happen in the same task and the entry/exit
+	// animations fight into a full-strength ghost flash over already-rendered
+	// content. Skip it when the page's data is already local (mirrors stock's
+	// own cache check; __nu_showing is stamped by the show_page serialization).
+	proto.create_page_skeleton = function () {
+		if (this.__nu_showing && this.pages && this.pages[this.__nu_showing.name]) return;
+		return orig_create.call(this);
+	};
 
 	proto.remove_page_skeleton = function () {
 		const $skel = this.body && this.body.find(".workspace-skeleton");
@@ -485,6 +542,7 @@ function patch_workspace_race() {
 			while (this.__nu_pending_page) {
 				const next = this.__nu_pending_page;
 				this.__nu_pending_page = null;
+				this.__nu_showing = next; // read by the skeleton cache-skip
 				try {
 					await orig_show_page.call(this, next);
 				} catch (e) {
@@ -510,6 +568,7 @@ function patch_workspace_race() {
 			let latest = null;
 			this.editor.render = (data) => {
 				latest = data;
+				this.__nu_last_render = Date.now(); // watchdog grace stamp
 				const p = chain.then(() => {
 					if (latest !== data) return; // superseded by a newer render
 					return orig_render(data);
@@ -546,6 +605,10 @@ function arm_workspace_watchdog() {
 			const skeletons = ws.body.find(".workspace-skeleton").length;
 			const loading = frappe.request && frappe.request.ajax_count > 0;
 			if (skeletons > 0 || loading || attempts >= 2 || !ws._page) return;
+			// Grace window: a block swap can be mid-flight (del/add gap) on a
+			// cached, ajax-quiet switch — never rebuild during/just after a
+			// render, it would re-mount the skeleton and blink.
+			if (ws.__nu_last_render && Date.now() - ws.__nu_last_render < 3000) return;
 
 			// A hidden editor is a stuck blank page even with blocks in the
 			// DOM — strip the class (cheap) rather than rebuilding.

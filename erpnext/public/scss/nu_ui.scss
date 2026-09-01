@@ -775,8 +775,12 @@ input[type="checkbox"] {
 
 // Number cards swap their whole body when data arrives (no height reserved),
 // which made the card row oscillate while loading. Reserve the settled
-// height and let the loading text fade instead of popping.
+// height and let the loading text fade instead of popping. The box itself
+// also grows ~17px when the doc fetch completes (card chrome outside the
+// reserved body) and shoves the links below — floor the whole box too.
 .widget.number-widget-box {
+	min-height: 105px;
+
 	.widget-body {
 		min-height: 62px;
 		display: flex;
@@ -1523,9 +1527,12 @@ body.nu-chrome .page-container {
 		position: static;
 	}
 
-	// First-load list skeleton: host is still empty, so it can't be sized by
-	// inset — fixed height instead, pinned to the top of the content area.
-	&.nu-skel-first {
+	// Short/empty host (first-load list, empty form section, report page):
+	// an inset layer would collapse to the host's height — fixed height
+	// instead, pinned to the top of the content area. Still an overlay:
+	// nothing ever mounts in-flow (in-flow caused the 400px reveal jump).
+	&.nu-skel-first,
+	&.nu-skel-clip {
 		bottom: auto;
 		height: 420px;
 	}
@@ -1721,10 +1728,27 @@ body.nu-chrome .page-container {
 	}
 }
 
+// During the exit fade the skeleton must not participate in layout: stock
+// un-hides the editor first and removes the skeleton 240ms later, so an
+// in-flow skeleton lets the content render *below* it and then snaps up on
+// removal (measured 563px on desktop, 1266px stacked on mobile). Pin the
+// fading skeleton as an overlay on the content area instead.
+.page-container[data-page-route="Workspaces"] .layout-main-section {
+	position: relative;
+}
+
 .workspace-skeleton {
 	animation: nu-skel-layer-in 0.16s ease-out;
 
 	&.nu-skel-out {
+		position: absolute;
+		top: 0;
+		left: 0;
+		right: 0;
+		z-index: 2;
+		// If create+remove land in the same task (cached switch), the entry
+		// animation would fight the fade into a ghost flash — kill it.
+		animation: none;
 		opacity: 0;
 		transition: opacity 0.22s ease;
 		pointer-events: none;
@@ -1744,10 +1768,13 @@ body.nu-chrome .page-container {
 
 // -- Real-content entry ------------------------------------------------------
 
-// Rows cascade in whenever a list-family view (re)renders its result set.
-// Only the first 8 rows animate — on a 100-row page, animating every row
-// floods the compositor and the tail rows are below the fold anyway.
-body.nu-chrome .list-view .list-row-container {
+// Rows cascade in on a list-family view's FIRST render. Only the first 8 rows
+// animate — on a 100-row page, animating every row floods the compositor and
+// the tail rows are below the fold anyway. Gated on :not(.nu-rendered): every
+// refresh/paging/realtime update re-creates the row nodes, so an ungated
+// cascade replayed on each re-render and read as blinking; motion.js adds
+// .nu-rendered after the first render settles.
+body.nu-chrome .list-view .frappe-list:not(.nu-rendered) .list-row-container {
 	&:nth-child(-n + 8) {
 		animation: nu-row-in 0.24s cubic-bezier(0.16, 1, 0.3, 1) backwards;
 	}
