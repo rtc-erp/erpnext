@@ -52,7 +52,7 @@ export class NUTopbar {
 					${
 						frappe.boot.desk_settings.notifications && frappe.session.user !== "Guest"
 							? `<button class="nu-icon-btn sidebar-notification hidden" data-tip="${__("Notifications")}" aria-label="${__("Notifications")}">
-								${frappe.utils.icon("bell", "sm")}
+								<span class="sidebar-item-icon">${frappe.utils.icon("bell", "sm")}</span>
 								<span class="sidebar-notification-count hidden" aria-live="polite"></span>
 							</button>`
 							: ""
@@ -84,19 +84,25 @@ export class NUTopbar {
 					</div>
 					<div class="nu-more-list"></div>
 				</div>
-				<div class="dropdown-notifications hidden">
-					<div class="notifications-list" role="menu">
-						<div class="notification-list-header">
-							<div class="header-items"></div>
-							<div class="header-actions"></div>
-						</div>
-						<div class="notification-list-body">
-							<div class="panel-notifications"></div>
-							<div class="panel-events"></div>
-							<div class="panel-changelog-feed"></div>
-						</div>
-					</div>
-				</div>
+				${
+					// Shell the stock frappe.ui.Notifications class wires itself
+					// into (setup_notifications); only rendered when the bell is.
+					frappe.boot.desk_settings.notifications && frappe.session.user !== "Guest"
+						? `<div class="dropdown-notifications hidden">
+							<div class="notifications-list" role="menu">
+								<div class="notification-list-header">
+									<div class="header-items"></div>
+									<div class="header-actions"></div>
+								</div>
+								<div class="notification-list-body">
+									<div class="panel-notifications"></div>
+									<div class="panel-events"></div>
+									<div class="panel-changelog-feed"></div>
+								</div>
+							</div>
+						</div>`
+						: ""
+				}
 			</div>
 		`);
 
@@ -131,7 +137,13 @@ export class NUTopbar {
 			$("#navbar-modal-search").trigger("click");
 		});
 
-		this.$root.find(".sidebar-notification").on("click", () => {
+		this.$root.find(".sidebar-notification").on("click", (e) => {
+			// Keep the stock instance's document click-outside handler (which
+			// only exempts its own sidebar bell) from seeing our bell clicks —
+			// otherwise it would re-hide the panel on the same click that opens
+			// it. Everything else (panel content, true outside clicks) still
+			// flows through the stock handler exactly like stock.
+			e.stopPropagation();
 			const $dropdown = this.$root.find(".dropdown-notifications");
 			if ($dropdown.hasClass("hidden")) {
 				$dropdown.removeClass("hidden nu-menu-out");
@@ -165,6 +177,7 @@ export class NUTopbar {
 			if (e.key === "Escape") {
 				this.close_more();
 				this.close_theme_menu();
+				this.close_notifications();
 			}
 		});
 	}
@@ -175,6 +188,37 @@ export class NUTopbar {
 				wrapper: this.$root,
 				full_height: true,
 			});
+
+			// The stock view resolves the badge and the bell indicator through a
+			// closest(".body-sidebar") ancestor — the stock sidebar's shell, which
+			// our top bar deliberately does not borrow (stock JS inserts DOM into
+			// every $(".body-sidebar") match). Point both lookups at our bell
+			// instead; all the logic (counts, aria, indicator dot, realtime)
+			// stays stock.
+			const view = this.notifications.tabs && this.notifications.tabs.notifications;
+			if (view) {
+				view.bell_indicator = this.$root.find(
+					".sidebar-notification .sidebar-item-icon"
+				);
+				const $badge = this.$root.find(".sidebar-notification-count");
+				// Same body as the stock update_count_badge (notifications.js),
+				// with $suffix resolved to our badge instead of the sidebar's.
+				view.update_count_badge = function (count) {
+					this.unread_count = count;
+					if (!$badge.length) return;
+					if (count > 0) {
+						$badge
+							.text(count > 99 ? "99+" : count)
+							.attr("aria-label", __("{0} unread notifications", [count]))
+							.removeClass("hidden");
+					} else {
+						$badge.removeAttr("aria-label").addClass("hidden");
+					}
+				};
+				// The constructor's own initial badge call ran before the patch
+				// above (against the missing stock shell) — replay it.
+				view.update_count_badge(view.unread_count || 0);
+			}
 		}
 	}
 
@@ -220,6 +264,10 @@ export class NUTopbar {
 	close_more() {
 		this.more_open = false;
 		this.hide_menu(this.$root.find(".nu-more-card"));
+	}
+
+	close_notifications() {
+		this.hide_menu(this.$root.find(".dropdown-notifications"));
 	}
 
 	render_more_list(query) {

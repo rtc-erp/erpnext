@@ -36,6 +36,13 @@ class NUChrome {
 			// startup (before ours), so frappe.app.sidebar.sidebar_title is
 			// already resolved for the new route when we get here.
 			this.sync_from_stock();
+			// Stock occasionally settles its resolution a beat after the change
+			// event (late route_options application, workspace redirects). Every
+			// show_* path early-returns when nothing changed, so short delayed
+			// re-syncs self-correct a stale read without re-render flapping.
+			for (const delay of [150, 600]) {
+				setTimeout(() => this.sync_from_stock(), delay);
+			}
 		});
 
 		// Initial state for the route we booted on. The first workspace render
@@ -85,9 +92,19 @@ class NUChrome {
 		} else {
 			const extra = more_sidebars().find((m) => m.key === key);
 			if (extra) {
-				if (!(this.active && this.active.kind === "more" && this.active.key === extra.key)) {
-					this.show_extra(extra);
-				}
+				// The "More" tab only names a module while the user is inside one
+				// they opened through the More card. A stock resolution that lands
+				// on an overflow module any other way (awesomebar, deep link, or
+				// stock resolving a page to the module its doctype belongs to —
+				// e.g. System Settings -> Core) still renders that module's
+				// sidebar, but the tab stays plain "More".
+				const named = !!(
+					this.active &&
+					this.active.kind === "more" &&
+					this.active.key === extra.key &&
+					this.active.named
+				);
+				this.show_extra(extra, { named });
 			} else {
 				const data = get_sidebars()[key];
 				if (data && !(this.active && this.active.kind === "raw" && this.active.key === key)) {
@@ -96,7 +113,11 @@ class NUChrome {
 			}
 		}
 
-		if (this.active && (this.active.kind === "pinned" || this.active.kind === "more")) {
+		if (
+			this.active &&
+			(this.active.kind === "pinned" ||
+				(this.active.kind === "more" && this.active.named))
+		) {
 			this.remember_route(this.active.storage_key, this.current_path());
 		}
 		this.sidebar.sync_active();
@@ -125,21 +146,31 @@ class NUChrome {
 		);
 	}
 
-	show_extra(mod) {
+	show_extra(mod, opts) {
+		const named = !opts || opts.named !== false;
+		const same_module =
+			this.active && this.active.kind === "more" && this.active.key === mod.key;
+		if (same_module && this.active.named === named) return;
+
 		this.active = {
 			kind: "more",
 			key: mod.key,
 			storage_key: `more:${mod.key}`,
 			title: mod.data.label || mod.label,
 			data: mod.data,
+			named,
 		};
-		this.topbar.set_active("more", this.active.title);
-		this.sidebar.show(
-			this.active.title,
-			mod.data.header_icon,
-			group_items(mod.data.items),
-			mod.key
-		);
+		this.topbar.set_active("more", named ? this.active.title : null);
+		// A named<->unnamed flip for the same module only relabels the tab —
+		// the sidebar content is identical, so re-rendering it would just flap.
+		if (!same_module) {
+			this.sidebar.show(
+				this.active.title,
+				mod.data.header_icon,
+				group_items(mod.data.items),
+				mod.key
+			);
+		}
 	}
 
 	// Sidebars that are neither pinned nor in the More list (e.g. My

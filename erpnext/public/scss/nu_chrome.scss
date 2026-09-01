@@ -36,7 +36,10 @@ body.nu-chrome .body-sidebar-container {
 .nu-topbar {
 	position: sticky;
 	top: 0;
-	z-index: 1020;
+	// Above the desk-grid's sticky .desktop-navbar (1030) so the bar's own
+	// menus (notifications panel, More card, theme menu) paint over it — a
+	// child's z-index can't escape this bar's stacking context otherwise.
+	z-index: 1040;
 	display: flex;
 	align-items: center;
 	gap: 8px;
@@ -255,13 +258,46 @@ body.nu-chrome .body-sidebar-container {
 	font-size: 13px;
 }
 
-// 4. Notifications dropdown (stock markup, repositioned under the top bar) --
+// 4. Notifications dropdown (stock markup + stock frappe.ui.Notifications,
+// repositioned under the top bar) ------------------------------------------
+
+.nu-topbar .sidebar-notification {
+	position: relative;
+}
+.nu-topbar .sidebar-notification .sidebar-item-icon {
+	display: inline-flex;
+}
+// Unread count as a corner badge on the bell (stock renders a sidebar pill).
+.nu-topbar .sidebar-notification-count {
+	position: absolute;
+	top: -4px;
+	right: -6px;
+	min-width: 15px;
+	height: 15px;
+	padding: 0 4px;
+	font-size: 10px;
+	line-height: 15px;
+	border-radius: 8px;
+}
+
+// Stock renders the panel as a full-height side sheet at the sidebar edge;
+// anchored under our bar it becomes a bounded card like the other nu menus.
+.nu-topbar .dropdown-notifications .notifications-list {
+	left: auto;
+	right: 0;
+	height: calc(100vh - 110px);
+	min-height: 320px;
+	background-color: var(--fg-color);
+	border: 1px solid var(--border-color);
+	border-radius: var(--border-radius-lg, 12px);
+	box-shadow: var(--shadow-lg, 0 12px 32px rgba(16, 24, 40, 0.16));
+}
 
 .nu-topbar .dropdown-notifications {
 	position: absolute;
 	top: calc(100% + 6px);
 	right: 12px;
-	z-index: 1030;
+	z-index: 1040;
 }
 
 // 4b. Theme switcher menu (under the top-bar theme button) ------------------
@@ -703,6 +739,15 @@ body.nu-chrome .desktop-icon .icon-caption .icon-title {
 
 // 6. Small screens: sidebar becomes an overlay drawer ------------------------
 
+@media (max-width: 768px) {
+	// Stock's mobile rule forces the panel 100vw wide and pushes it past the
+	// viewport edge; keep it inside the bar's padding instead.
+	.nu-topbar .dropdown-notifications .notifications-list {
+		min-width: 0;
+		width: calc(100vw - 24px);
+	}
+}
+
 @media (max-width: 992px) {
 	.nu-menu-toggle {
 		display: inline-flex;
@@ -713,7 +758,7 @@ body.nu-chrome .desktop-icon .icon-caption .icon-title {
 		top: 0;
 		bottom: 0;
 		height: auto;
-		z-index: 1031;
+		z-index: 1045;
 		transform: translateX(-100%);
 		transition: transform var(--nu-motion-med, 0.18s) var(--nu-ease, ease);
 		box-shadow: var(--modal-shadow, 0 24px 60px rgba(16, 24, 40, 0.28));
@@ -725,7 +770,7 @@ body.nu-chrome .desktop-icon .icon-caption .icon-title {
 		display: block;
 		position: fixed;
 		inset: 0;
-		z-index: 1030;
+		z-index: 1042;
 		background: rgba(0, 0, 0, 0.35);
 		opacity: 0;
 		pointer-events: none;
