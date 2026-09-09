@@ -12,10 +12,19 @@
 //        already has stock's Duplicate (Shift+D); row-level duplication in
 //        the accounts grid is covered by stock (expanded row → Duplicate,
 //        Shift+Alt+Down) and by NU-ERP's insert-below additions.
+//   D1   Transaction date in the list — a real Posting Date column is
+//        spliced into listview.columns, so stock rendering and header
+//        click-sort work natively. Display mode toggles Gregorian ⇄
+//        Jalali (nu.jalali, persisted in localStorage); conversion is
+//        presentation-only — stored values stay Gregorian.
+
+const NU_JE_DATE_MODE_KEY = "nu_je_list_date_mode";
 
 Object.assign(frappe.listview_settings["Journal Entry"], {
 	onload(listview) {
 		nu_je_relabel_id_column(listview);
+		nu_je_add_posting_date_column(listview);
+		nu_je_setup_date_mode(listview);
 
 		listview.page.add_actions_menu_item(__("Duplicate"), () => {
 			nu_je_duplicate_checked(listview);
@@ -23,8 +32,70 @@ Object.assign(frappe.listview_settings["Journal Entry"], {
 	},
 	refresh(listview) {
 		nu_je_relabel_id_column(listview);
+		// user-edited List View Settings rebuild columns — re-splice ours
+		nu_je_add_posting_date_column(listview);
+	},
+	formatters: {
+		posting_date(value) {
+			if (!value) return "";
+			// must return HTML — stock feeds formatter output to $(...) when
+			// measuring column width, and a bare "1405/06/18" is an invalid
+			// selector (Sizzle throws and kills the whole list render)
+			const text =
+				nu_je_date_mode() === "jalali"
+					? nu.jalali.format(value)
+					: frappe.datetime.str_to_user(value);
+			return `<span>${text}</span>`;
+		},
 	},
 });
+
+function nu_je_date_mode() {
+	return localStorage.getItem(NU_JE_DATE_MODE_KEY) === "jalali" ? "jalali" : "gregorian";
+}
+
+function nu_je_add_posting_date_column(listview) {
+	if (!listview.columns) return;
+	if (listview.columns.some((c) => c.df && c.df.fieldname === "posting_date")) return;
+	const df = frappe.meta.get_docfield("Journal Entry", "posting_date");
+	if (!df) return;
+	// before the ID (name) column if stock appended one, else at the end
+	const id_index = listview.columns.findIndex((c) => c.df && c.df.fieldname === "name");
+	listview.columns.splice(id_index === -1 ? listview.columns.length : id_index, 0, {
+		type: "Field",
+		df,
+	});
+	listview.render_header(true);
+}
+
+function nu_je_setup_date_mode(listview) {
+	const anchor =
+		listview.$filter_section && listview.$filter_section.find(".sort-selector").last();
+	if (!anchor || !anchor.length) return;
+	if (anchor.parent().find(".nu-date-mode").length) return;
+
+	const wrap = $(
+		`<div class="nu-date-mode" title="${__("Posting Date display — stored dates stay Gregorian")}">
+			<button type="button" data-mode="gregorian">${__("Gregorian")}</button>
+			<button type="button" data-mode="jalali">${__("Jalali")}</button>
+		</div>`
+	);
+	const sync = () =>
+		wrap
+			.find("button")
+			.each(function () {
+				$(this).toggleClass("active", $(this).attr("data-mode") === nu_je_date_mode());
+			});
+	wrap.find("button").on("click", function () {
+		localStorage.setItem(NU_JE_DATE_MODE_KEY, $(this).attr("data-mode"));
+		sync();
+		// re-render from the data already in hand — refresh() would hit
+		// stock's no_change skip and leave the old format on screen
+		listview.render();
+	});
+	sync();
+	anchor.before(wrap);
+}
 
 function nu_je_relabel_id_column(listview) {
 	listview.$result.find(".list-row-head .list-row-col").each(function () {

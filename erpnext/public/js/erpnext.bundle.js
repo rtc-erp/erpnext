@@ -42,3 +42,6 @@ import "./purchase_trends_filters.js";
 
 // NU-ERP custom desk chrome (top module bar + left menu).
 import "./nu_chrome";
+
+// NU-ERP Jalali (Shamsi) date utilities — desk-global (nu.jalali).
+import "./nu_jalali";
