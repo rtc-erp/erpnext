@@ -1844,3 +1844,87 @@ body.nu-chrome .form-grid .nu-insert-below {
 		margin-left: var(--margin-sm);
 	}
 }
+
+
+// ---------------------------------------------------------------------------
+// 22. Jalali dates — list date-mode toggle + form converter (feedback D1/D2)
+// ---------------------------------------------------------------------------
+
+// Two-pill Gregorian | Jalali selector next to the sort dropdown on the
+// Journal Entry list. Segmented-control styling on the design tokens.
+.nu-date-mode {
+	display: inline-flex;
+	align-items: center;
+	margin-right: var(--margin-sm);
+	border: 1px solid var(--border-color);
+	border-radius: var(--border-radius-md);
+	overflow: hidden;
+	background: var(--control-bg);
+
+	button {
+		border: none;
+		background: transparent;
+		color: var(--text-muted);
+		font-size: var(--text-sm);
+		padding: 3px 10px;
+		transition:
+			background-color var(--nu-motion-fast) var(--nu-ease),
+			color var(--nu-motion-fast) var(--nu-ease);
+
+		&:hover {
+			color: var(--text-color);
+		}
+
+		&.active {
+			background: var(--nu-accent-soft);
+			color: var(--nu-accent-contrast);
+			font-weight: 600;
+		}
+	}
+}
+
+// Jalali companion line under Posting Date (Journal Entry form).
+.nu-jalali-line {
+	margin-top: 2px;
+	min-height: 18px;
+
+	.nu-jalali-text {
+		border: none;
+		background: transparent;
+		padding: 0;
+		font-size: var(--text-sm);
+		color: var(--text-muted);
+
+		.nu-jalali-label {
+			font-weight: 600;
+			color: var(--nu-accent-contrast);
+		}
+
+		.nu-jalali-edit {
+			opacity: 0;
+			margin-left: 4px;
+			transition: opacity var(--nu-motion-fast) var(--nu-ease);
+		}
+
+		&:hover {
+			color: var(--text-color);
+
+			.nu-jalali-edit {
+				opacity: 0.7;
+			}
+		}
+	}
+
+	.nu-jalali-input {
+		max-width: 130px;
+		display: inline-block;
+
+		&.nu-jalali-invalid {
+			border-color: var(--red-400, #e24c4c);
+		}
+	}
+
+	.nu-jalali-error {
+		color: var(--red-500, #d63636);
+	}
+}

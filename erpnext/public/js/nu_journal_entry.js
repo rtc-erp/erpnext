@@ -10,6 +10,11 @@
 //        insert directly below the active row.
 //   #29  Document number visible after saving — show a success message with
 //        the assigned document number after every draft save.
+//   D2   Jalali date at entry time — Posting Date shows its Shamsi
+//        equivalent, and clicking it opens a converter input: type the
+//        Shamsi date (YYYY/MM/DD) and it is converted and stored as the
+//        Gregorian posting date. Storage stays Gregorian; conversion is
+//        presentation-only (nu.jalali).
 
 frappe.ui.form.on("Journal Entry", {
 	setup(frm) {
@@ -23,6 +28,11 @@ frappe.ui.form.on("Journal Entry", {
 		frm.set_df_property("user_remark", "hidden", 0);
 		// #15
 		nu_je_setup_insert_below(frm);
+		// D2 — Jalali companion under Posting Date
+		nu_je_render_jalali(frm);
+	},
+	posting_date(frm) {
+		nu_je_render_jalali(frm);
 	},
 	after_save(frm) {
 		// #29 — announce the document number on draft saves; submitted
@@ -135,4 +145,86 @@ function nu_je_setup_insert_below(frm) {
 	};
 	$(frm.wrapper).on("grid-row-render.nuje", (e, grid_row) => add_row_button(grid_row));
 	(grid.grid_rows || []).forEach(add_row_button);
+}
+
+
+// D2 — Jalali companion under Posting Date. A muted line shows the Shamsi
+// equivalent of the stored (Gregorian) date; clicking it swaps in a text
+// input where the user types the Shamsi date (YYYY/MM/DD, separators /-.
+// accepted) and it is converted and written back as Gregorian. Invalid
+// input is rejected in place — the stored value never changes.
+function nu_je_render_jalali(frm) {
+	const field = frm.fields_dict.posting_date;
+	if (!field || !field.$wrapper) return;
+	const input_area = field.$wrapper.find(".control-input");
+	if (!input_area.length) return;
+
+	let line = input_area.find(".nu-jalali-line");
+	if (!line.length) {
+		line = $('<div class="nu-jalali-line"></div>').appendTo(input_area);
+	}
+	if (line.data("editing")) return;
+
+	line.empty();
+	const j = nu.jalali.gregorian_to_jalali(frm.doc.posting_date);
+	if (!j) return;
+
+	const display = $(
+		`<button type="button" class="nu-jalali-text"
+			title="${__("Jalali (Shamsi) date — click to enter a Shamsi date and convert it")}">
+			<span class="nu-jalali-label">${__("Jalali")}</span> ${j.text}
+			<span class="nu-jalali-edit">${frappe.utils.icon("edit", "xs")}</span>
+		</button>`
+	);
+	display.tooltip({ delay: { show: 600, hide: 100 } });
+	display.on("click", () => nu_je_edit_jalali(frm, line, j.text));
+	line.append(display);
+}
+
+function nu_je_edit_jalali(frm, line, current) {
+	line.data("editing", true);
+	line.empty();
+
+	const input = $(
+		`<input type="text" class="nu-jalali-input input-with-feedback form-control"
+			placeholder="1405/06/18" dir="ltr">`
+	).val(current);
+	const hint = $(`<div class="nu-jalali-hint text-muted small">${__("Shamsi date, YYYY/MM/DD")}</div>`);
+	line.append(input, hint);
+	input.trigger("focus");
+	input.trigger("select");
+
+	const finish = (commit) => {
+		if (!commit) {
+			line.data("editing", false);
+			nu_je_render_jalali(frm);
+			return;
+		}
+		const iso = nu.jalali.jalali_to_gregorian(input.val());
+		if (iso) {
+			line.data("editing", false);
+			frm.set_value("posting_date", iso);
+		} else {
+			input.addClass("nu-jalali-invalid");
+			hint
+				.removeClass("text-muted")
+				.addClass("nu-jalali-error")
+				.text(__("Invalid Shamsi date — expected YYYY/MM/DD"));
+			input.trigger("focus");
+		}
+	};
+
+	input.on("keydown", (e) => {
+		if (e.key === "Enter") {
+			e.preventDefault();
+			finish(true);
+		} else if (e.key === "Escape") {
+			e.preventDefault();
+			finish(false);
+		}
+	});
+	input.on("blur", () => {
+		// unchanged text → just revert; changed text → try to commit once
+		finish(input.val().trim() !== current);
+	});
 }
