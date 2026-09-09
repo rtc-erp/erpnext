@@ -41,6 +41,7 @@ doctype_js = {
 	"Event": "public/js/event.js",
 	"Newsletter": "public/js/newsletter.js",
 	"Contact": "public/js/contact.js",
+	"Journal Entry": "public/js/nu_journal_entry.js",
 }
 doctype_list_js = {
 	"Code List": [
@@ -49,6 +50,7 @@ doctype_list_js = {
 	"Common Code": [
 		"edi/doctype/code_list/code_list_import.js",
 	],
+	"Journal Entry": "public/js/nu_journal_entry_list.js",
 }
 
 page_js = {"print": "public/js/print.js"}

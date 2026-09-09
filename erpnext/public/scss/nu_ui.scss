@@ -1785,3 +1785,35 @@ body.nu-chrome .list-view .frappe-list:not(.nu-rendered) .list-row-container {
 		}
 	}
 }
+
+
+// ---------------------------------------------------------------------------
+// 20. Journal Entry grid — active-row selection (feedback #15)
+// ---------------------------------------------------------------------------
+
+// The row the user last clicked/focused is the insert target for Add Row /
+// Ctrl/Cmd+Enter / the per-row "+" button (nu_journal_entry.js). Accent-soft
+// wash + a leading accent edge so the target is unmissable without reading
+// as a checkbox selection (which stays stock).
+body.nu-chrome .form-grid .grid-row.nu-active-row {
+	> .data-row {
+		background-color: var(--nu-accent-soft);
+		box-shadow: inset 2px 0 0 var(--nu-accent);
+	}
+
+	&.grid-row-open > .data-row {
+		box-shadow: none;
+	}
+}
+
+// Per-row insert-below button — sits beside the stock edit pencil and
+// inherits .btn-open-row geometry; just spacing + a quieter resting state.
+body.nu-chrome .form-grid .nu-insert-below {
+	margin-right: 2px;
+	opacity: 0.45;
+	transition: opacity var(--nu-motion-fast) var(--nu-ease);
+
+	&:hover {
+		opacity: 1;
+	}
+}
