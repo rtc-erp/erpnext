@@ -45,3 +45,6 @@ import "./nu_chrome";
 
 // NU-ERP Jalali (Shamsi) date utilities — desk-global (nu.jalali).
 import "./nu_jalali";
+
+// NU-ERP General Ledger "User Remark" column (JE header remark).
+import "./nu_gl_user_remark";
