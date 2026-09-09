@@ -1817,3 +1817,30 @@ body.nu-chrome .form-grid .nu-insert-below {
 		opacity: 1;
 	}
 }
+
+// ---------------------------------------------------------------------------
+// 21. Chart of Accounts — in-transit draft badges (feedback #34)
+// ---------------------------------------------------------------------------
+
+// ⇢ Dr / ⇠ Cr amounts from draft (docstatus = 0) journal entries, rendered
+// next to the posted balance in the CoA tree and in the Account list. Muted
+// by design: provisional numbers must read as secondary to posted balances.
+.nu-transit-area {
+	font-size: var(--text-sm);
+	font-weight: 500;
+	color: var(--text-muted);
+	white-space: nowrap;
+
+	.nu-transit-dr {
+		color: var(--nu-accent-contrast);
+	}
+
+	.nu-transit-cr {
+		color: var(--text-muted);
+	}
+
+	// the tree already pull-rights the badge; the list needs the gutter
+	.list-row & {
+		margin-left: var(--margin-sm);
+	}
+}

@@ -51,6 +51,10 @@ doctype_list_js = {
 		"edi/doctype/code_list/code_list_import.js",
 	],
 	"Journal Entry": "public/js/nu_journal_entry_list.js",
+	"Account": "public/js/nu_account_list.js",
+}
+doctype_tree_js = {
+	"Account": "public/js/nu_account_tree.js",
 }
 
 page_js = {"print": "public/js/print.js"}
