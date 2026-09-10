@@ -1928,3 +1928,58 @@ body.nu-chrome .form-grid .nu-insert-below {
 		color: var(--red-500, #d63636);
 	}
 }
+
+
+// ---------------------------------------------------------------------------
+// 23. User form — Company Access tab (per-company user permissions)
+// ---------------------------------------------------------------------------
+
+.nu-ca-section {
+	max-width: 560px;
+
+	.nu-ca-head h6 {
+		font-weight: 600;
+		margin-bottom: 2px;
+	}
+
+	.nu-ca-help {
+		margin-bottom: var(--margin-md);
+	}
+
+	.nu-ca-companies {
+		display: flex;
+		flex-direction: column;
+		gap: 2px;
+		margin-bottom: var(--margin-md);
+	}
+
+	.nu-ca-company {
+		display: flex;
+		align-items: center;
+		gap: 8px;
+		padding: 7px 10px;
+		border-radius: var(--border-radius-md);
+		cursor: pointer;
+		transition: background-color var(--nu-motion-fast) var(--nu-ease);
+
+		&:hover {
+			background: var(--subtle-accent);
+		}
+
+		input[type="checkbox"] {
+			margin: 0;
+		}
+
+		.nu-ca-default {
+			margin-left: auto;
+			color: var(--nu-accent-contrast);
+			font-weight: 600;
+		}
+	}
+
+	.nu-ca-actions {
+		display: flex;
+		align-items: center;
+		gap: var(--margin-sm);
+	}
+}

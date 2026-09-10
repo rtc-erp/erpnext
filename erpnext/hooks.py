@@ -42,6 +42,7 @@ doctype_js = {
 	"Newsletter": "public/js/newsletter.js",
 	"Contact": "public/js/contact.js",
 	"Journal Entry": "public/js/nu_journal_entry.js",
+	"User": "public/js/nu_user_company_access.js",
 }
 doctype_list_js = {
 	"Code List": [
